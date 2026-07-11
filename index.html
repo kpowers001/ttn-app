@@ -1,0 +1,915 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tuskegee Trail Network</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone@7.22.17/babel.min.js"></script>
+  <script>
+    Babel.registerPreset('react-classic', {
+      presets: [[Babel.availablePresets['react'], { runtime: 'classic' }]]
+    });
+  </script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #E8E8E8;
+      display: flex; justify-content: center; align-items: center;
+      min-height: 100vh; padding: 24px;
+    }
+    .phone {
+      width: 390px; height: 844px; background: #FFFFFF;
+      border-radius: 52px; overflow: hidden; position: relative;
+      box-shadow: 0 8px 48px rgba(0,0,0,0.18), 0 0 0 1px rgba(0,0,0,0.06);
+    }
+    .notch {
+      position: absolute; top: 0; left: 50%; transform: translateX(-50%);
+      width: 126px; height: 34px; background: #111;
+      border-radius: 0 0 20px 20px; z-index: 999;
+    }
+    .screen { width: 100%; height: 100%; overflow: hidden; position: relative; background: #F5F5F5; }
+    .scroll { overflow-y: auto; -webkit-overflow-scrolling: touch; }
+    .scroll::-webkit-scrollbar { display: none; }
+    @keyframes fadeUp { from { opacity:0; transform:translateY(14px); } to { opacity:1; transform:translateY(0); } }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+    @keyframes shimmer { from{opacity:0.5} to{opacity:1} }
+    .fadeup { animation: fadeUp 0.4s cubic-bezier(0.22,1,0.36,1) forwards; }
+    button { font-family: inherit; }
+    input, select { font-family: inherit; }
+    ::placeholder { color: #C0C0C0; }
+  </style>
+</head>
+<body>
+<div class="phone">
+  <div class="notch"></div>
+  <div id="root" style="width:100%;height:100%"></div>
+</div>
+
+<script type="text/babel" data-presets="react-classic">
+const { useState, useEffect, useRef } = React;
+
+// ─── Theme ────────────────────────────────────────────────────────────────────
+const C  = '#D42020';                    // crimson — brand, CTAs
+const DC = '#AA1818';                    // dark crimson
+const G  = '#C8A415';                    // gold
+const GL = '#FEF9E7';                    // gold light tint
+const BG = '#F5F5F5';                    // page background
+const S1 = '#FFFFFF';                    // card/surface
+const T1 = '#1A1A1A';                    // primary text
+const T2 = '#717171';                    // secondary text
+const T3 = '#ADADAD';                    // muted text
+const BD = '#EBEBEB';                    // border
+const SH = '0 1px 10px rgba(0,0,0,0.08)'; // card shadow
+
+// ─── Data ─────────────────────────────────────────────────────────────────────
+const TRAILS = {
+  food: { name:'Food Trail', icon:'🍽️', color:'#D44000', locations:[
+    {id:'f1', name:'B&B Barbecue',          desc:'Classic Alabama BBQ & smoked meats',              lat:32.4193, lng:-85.6951, visited:true,  pts:50},
+    {id:'f2', name:'New House of Stewarts', desc:'Southern cuisine & event venue on W MLK Hwy',     lat:32.4218, lng:-85.7198, visited:false, pts:50},
+  ]},
+  history: { name:'History Trail', icon:'🏛️', color:'#8B1A1A', locations:[
+    {id:'h1', name:'Tuskegee Airmen NHS',   desc:'Historic Moton Field · Wed–Sat 9 AM–4:30 PM',    lat:32.4604, lng:-85.6764, visited:true,  pts:75},
+    {id:'h2', name:'G.W. Carver Museum',    desc:'NPS visitor center on campus · free admission',   lat:32.4247, lng:-85.7088, visited:false, pts:75},
+  ]},
+  farm: { name:'Farm Trail', icon:'🌾', color:'#2E7D32', locations:[
+    {id:'fa1', name:'Macon County Farmers Market', desc:'Wed & Sat 8 AM–2 PM · May through Sep',   lat:32.4163, lng:-85.6943, visited:false, pts:60},
+    {id:'fa2', name:'Shady Grove Blueberry Patch', desc:'U-pick blueberries · County Road 81',     lat:32.3892, lng:-85.6845, visited:true,  pts:60},
+    {id:'fa3', name:'Tuskegee Honey',              desc:'Raw wildflower honey · find at Farmers Market', lat:32.4160, lng:-85.6958, visited:false, pts:60},
+  ]},
+  arts: { name:'Arts Trail', icon:'🎨', color:'#6A1B9A', locations:[
+    {id:'a1', name:'Legacy Museum',         desc:'TU art collections & bioethics exhibits',         lat:32.4252, lng:-85.7063, visited:true,  pts:65},
+  ]},
+};
+
+const ALL_LOCS = Object.entries(TRAILS).flatMap(([k,t])=>t.locations.map(l=>({...l,trailKey:k,trail:t})));
+
+const CHALLENGES = [
+  // ── Active ──
+  {id:1, title:'Friday Night Pit Special',  biz:'B&B Barbecue',                type:'food',    pts:150, expires:'2 days',   deadline:'Jul 11', participants:24, desc:'Visit the legendary B&B pit on Fonville St and taste classic Alabama smoked meats.',             icon:'🍖', badge:'🔥', active:true},
+  {id:2, title:'Pick Before Season Ends',   biz:'Shady Grove Blueberry Patch', type:'farm',    pts:200, expires:'4 days',   deadline:'Jul 13', participants:12, desc:'Head to County Road 81 and pick fresh blueberries straight from the vine before the season closes.', icon:'🫐', badge:'🌱', active:true},
+  {id:3, title:'Art & Ethics Walk',         biz:'Legacy Museum',               type:'arts',    pts:175, expires:'Tomorrow', deadline:'Jul 9',  participants:31, desc:'Tour the TU Legacy Museum — student art collections and groundbreaking bioethics research on campus.', icon:'🎨', badge:'🎭', active:true},
+  // ── Coming Up ──
+  {id:4, title:'Airmen History Day',        biz:'Tuskegee Airmen NHS',         type:'history', pts:250, expires:'Next week',deadline:'Jul 15', participants:8,  desc:'Visit Moton Field and learn how the Tuskegee Airmen changed American military history forever.',       icon:'✈️', badge:'📚', active:false},
+  {id:5, title:'Saturday Market Run',       biz:'Macon County Farmers Market', type:'farm',    pts:120, expires:'Next week',deadline:'Jul 16', participants:18, desc:'Shop local at Elm & Spring St — find the Tuskegee Honey stand while you are there.',                 icon:'🛒', badge:'🏆', active:false},
+  {id:6, title:'Stewarts Sunday Brunch',    biz:'New House of Stewarts',       type:'food',    pts:130, expires:'2 weeks', deadline:'Jul 20', participants:9,  desc:'Experience Sunday brunch at New House of Stewarts on W MLK Hwy — a true Tuskegee institution.',      icon:'🍳', badge:'🌟', active:false},
+  {id:7, title:'Carver Science Discovery',  biz:'G.W. Carver Museum',          type:'history', pts:200, expires:'2 weeks', deadline:'Jul 22', participants:14, desc:"Walk through the G.W. Carver Museum and discover the legacy of one of America's greatest scientists.", icon:'🧪', badge:'🔬', active:false},
+];
+
+const LB = {
+  weekly:[
+    {rank:1,name:'Jasmine T.',  pts:1850,badges:8, av:'👩🏾',me:false,yr:'Senior'},
+    {rank:2,name:'Marcus W.',   pts:1720,badges:7, av:'👨🏿',me:false,yr:'Junior'},
+    {rank:3,name:'You',         pts:1540,badges:6, av:'😊', me:true, yr:'Sophomore'},
+    {rank:4,name:'Aaliyah M.',  pts:1420,badges:5, av:'👩🏽',me:false,yr:'Freshman'},
+    {rank:5,name:'Devon K.',    pts:1280,badges:5, av:'👨🏾',me:false,yr:'Senior'},
+    {rank:6,name:'Priya S.',    pts:1150,badges:4, av:'👩🏽',me:false,yr:'Junior'},
+    {rank:7,name:'Kai J.',      pts:980, badges:4, av:'👤', me:false,yr:'Sophomore'},
+    {rank:8,name:'Zara B.',     pts:870, badges:3, av:'👩🏿',me:false,yr:'Freshman'},
+  ],
+  monthly:[
+    {rank:1,name:'Devon K.',    pts:7240,badges:12,av:'👨🏾',me:false,yr:'Senior'},
+    {rank:2,name:'You',         pts:6890,badges:11,av:'😊', me:true, yr:'Sophomore'},
+    {rank:3,name:'Jasmine T.',  pts:6540,badges:10,av:'👩🏾',me:false,yr:'Senior'},
+    {rank:4,name:'Marcus W.',   pts:5920,badges:9, av:'👨🏿',me:false,yr:'Junior'},
+    {rank:5,name:'Aaliyah M.',  pts:5640,badges:8, av:'👩🏽',me:false,yr:'Freshman'},
+  ],
+  allTime:[
+    {rank:1,name:'Marcus W.',   pts:24680,badges:18,av:'👨🏿',me:false,yr:'Junior'},
+    {rank:2,name:'Jasmine T.',  pts:22150,badges:16,av:'👩🏾',me:false,yr:'Senior'},
+    {rank:3,name:'Devon K.',    pts:19870,badges:15,av:'👨🏾',me:false,yr:'Senior'},
+    {rank:4,name:'Zara B.',     pts:18420,badges:14,av:'👩🏿',me:false,yr:'Freshman'},
+    {rank:5,name:'You',         pts:16950,badges:13,av:'😊', me:true, yr:'Sophomore'},
+  ],
+};
+
+const TIERS = [
+  {tier:'Bronze',  min:0,    max:999,   icon:'🥉',col:'#CD7F32',rewards:['10% off Bookstore','Free Campus Coffee','Campus Tour Priority']},
+  {tier:'Silver',  min:1000, max:2499,  icon:'🥈',col:'#888888',rewards:['20% off Bookstore','Free Campus Meal','Priority Event Access','$5 Campus Voucher']},
+  {tier:'Gold',    min:2500, max:4999,  icon:'🥇',col:'#C8A415',rewards:['30% off Bookstore','$10 Restaurant Card','VIP Event Access','$15 Campus Voucher']},
+  {tier:'Platinum',min:5000, max:9999,  icon:'💎',col:'#5C9BD4',rewards:['40% off Bookstore','$25 Restaurant Card','Exclusive Campus Gear','VIP Everything']},
+  {tier:'Legend',  min:10000,max:Infinity,icon:'👑',col:'#C8A415',rewards:['50% off Bookstore','Scholarship Entry','Campus Ambassador','Exclusive Recognition']},
+];
+
+const STORIES = [
+  {id:1, meet:'Ms. Josie',    biz:'Shady Grove Blueberry Patch', av:'👩🏾‍🌾', bg1:'#1A4A1E', bg2:'#4A9E52', accent:'#2E7D32'},
+  {id:2, meet:'Chef Marcus',  biz:'The Golden Fork',             av:'👨🏿‍🍳', bg1:'#B03A00', bg2:'#E8722A', accent:'#D44000'},
+  {id:3, meet:'Dr. Williams', biz:'G.W. Carver Museum',          av:'👨🏾‍🏫', bg1:'#5C0E0E', bg2:'#A83030', accent:'#8B1A1A'},
+  {id:4, meet:'Maya Chen',    biz:'Tuskegee Art Gallery',        av:'👩🏽‍🎨', bg1:'#3A0060', bg2:'#9040B8', accent:'#6A1B9A'},
+  {id:5, meet:'Coach T.',     biz:'TU Athletics Dept.',          av:'👨🏾‍💼', bg1:'#7A5A00', bg2:'#C8A415', accent:'#C8A415'},
+];
+
+const BADGES_DATA = [
+  {icon:'🍽️',name:'Food Explorer',  earned:true},
+  {icon:'🎨',name:'Art Lover',       earned:true},
+  {icon:'🌾',name:'Farm Fresh',      earned:true},
+  {icon:'🏛️',name:'Historian',       earned:false},
+  {icon:'👣',name:'Pioneer',         earned:false},
+  {icon:'🗺️',name:'Grand Explorer',  earned:false},
+  {icon:'🔥',name:'Challenge King',  earned:false},
+  {icon:'👥',name:'Social Tiger',    earned:false},
+];
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+const StatusBar = () => (
+  <div style={{height:44,display:'flex',alignItems:'center',justifyContent:'space-between',padding:'8px 24px 0',fontSize:13,fontWeight:600,color:T1}}>
+    <span>9:41</span>
+    <div style={{display:'flex',gap:5,alignItems:'center',fontSize:11}}>
+      <span>●●●</span><span>WiFi</span><span>🔋</span>
+    </div>
+  </div>
+);
+
+const Pill = ({children,bg,col,border}) => (
+  <span style={{background:bg,color:col,borderRadius:20,padding:'4px 10px',fontSize:11,fontWeight:700,border:border?`1px solid ${border}`:undefined,whiteSpace:'nowrap'}}>
+    {children}
+  </span>
+);
+
+// ─── Splash ───────────────────────────────────────────────────────────────────
+function Splash({onDone}) {
+  useEffect(()=>{const t=setTimeout(onDone,2600);return()=>clearTimeout(t);},[]);
+  return (
+    <div style={{width:'100%',height:'100%',background:`linear-gradient(160deg,${DC} 0%,${C} 55%,#9B7A00 100%)`,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',overflow:'hidden',position:'relative'}}>
+      <div style={{position:'absolute',top:'18%',left:'50%',transform:'translateX(-50%)',width:260,height:260,borderRadius:'50%',background:'rgba(255,255,255,0.07)'}}/>
+      <div style={{animation:'fadeUp 0.9s cubic-bezier(0.22,1,0.36,1) both',textAlign:'center',padding:'0 40px'}}>
+        <div style={{fontSize:76,marginBottom:18,filter:'drop-shadow(0 8px 28px rgba(0,0,0,0.35))'}}>🗺️</div>
+        <div style={{fontSize:32,fontWeight:900,color:'#FFFFFF',lineHeight:1.1,letterSpacing:-0.5,fontFamily:'Georgia,serif'}}>Tuskegee<br/>Trail Network</div>
+        <div style={{fontSize:12,color:'rgba(255,255,255,0.7)',marginTop:10,letterSpacing:3,textTransform:'uppercase'}}>Explore · Discover · Connect</div>
+      </div>
+      <div style={{position:'absolute',bottom:72,display:'flex',gap:8}}>
+        {[0,1,2].map(i=><div key={i} style={{width:6,height:6,borderRadius:'50%',background:'rgba(255,255,255,0.6)',animation:`pulse ${0.9+i*0.25}s ${i*0.15}s infinite`}}/>)}
+      </div>
+      <div style={{position:'absolute',bottom:40,fontSize:10,color:'rgba(255,255,255,0.45)',letterSpacing:2}}>TUSKEGEE UNIVERSITY · EST. 1881</div>
+    </div>
+  );
+}
+
+// ─── Role Select ──────────────────────────────────────────────────────────────
+function RoleSelect({onPick}) {
+  return (
+    <div style={{width:'100%',height:'100%',background:S1,display:'flex',flexDirection:'column',padding:'60px 24px 40px'}}>
+      <div style={{marginBottom:32,animation:'fadeUp 0.5s cubic-bezier(0.22,1,0.36,1) both'}}>
+        <div style={{fontSize:12,color:T3,fontWeight:600,textTransform:'uppercase',letterSpacing:1.5,marginBottom:8}}>Welcome to</div>
+        <div style={{fontSize:36,fontWeight:900,color:T1,lineHeight:1.05,letterSpacing:-0.8,fontFamily:'Georgia,serif'}}>Tuskegee<br/>Trail Network</div>
+        <div style={{fontSize:15,color:T2,marginTop:10}}>How would you like to join?</div>
+      </div>
+      <div style={{display:'flex',flexDirection:'column',gap:12}}>
+        {[
+          {role:'student', emoji:'🎓',title:"I'm a Student",     sub:'Explore Tuskegee, earn points & rewards', border:C,  glow:'rgba(212,32,32,0.1)'},
+          {role:'business',emoji:'🏪',title:"I'm a Business Owner",sub:'Post challenges & connect with students',border:G,  glow:'rgba(200,164,21,0.1)'},
+        ].map(({role,emoji,title,sub,border,glow})=>(
+          <button key={role} onClick={()=>onPick(role)} style={{
+            background:S1, border:`1.5px solid ${border}20`, borderRadius:20,
+            padding:'20px 18px', cursor:'pointer', textAlign:'left',
+            boxShadow:`0 2px 20px ${glow}`, transition:'all 0.15s',
+            animation:'fadeUp 0.55s cubic-bezier(0.22,1,0.36,1) both'
+          }}
+          onMouseDown={e=>{e.currentTarget.style.transform='scale(0.98)';e.currentTarget.style.boxShadow=`0 1px 8px ${glow}`}}
+          onMouseUp={e=>{e.currentTarget.style.transform='scale(1)';e.currentTarget.style.boxShadow=`0 2px 20px ${glow}`}}
+          >
+            <div style={{fontSize:36,marginBottom:10}}>{emoji}</div>
+            <div style={{fontSize:17,fontWeight:800,color:T1}}>{title}</div>
+            <div style={{fontSize:13,color:T2,marginTop:3}}>{sub}</div>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ─── Login ────────────────────────────────────────────────────────────────────
+function Field({label,placeholder,type='text',val,onChange}) {
+  const [focused,setFocused]=useState(false);
+  return (
+    <div>
+      <div style={{fontSize:11,fontWeight:700,color:focused?C:T3,marginBottom:6,textTransform:'uppercase',letterSpacing:0.8,transition:'color 0.2s'}}>{label}</div>
+      <input type={type} value={val} onChange={e=>onChange(e.target.value)} placeholder={placeholder}
+        onFocus={()=>setFocused(true)} onBlur={()=>setFocused(false)}
+        style={{width:'100%',padding:'14px 16px',background:BG,border:`1.5px solid ${focused?C:BD}`,borderRadius:14,fontSize:15,color:T1,outline:'none',transition:'border 0.2s'}}
+      />
+    </div>
+  );
+}
+
+function Login({role,onLogin}) {
+  const [step,setStep]=useState('login');
+  const [form,setForm]=useState({email:'',pw:'',phone:'',year:'',username:''});
+  const isStu=role==='student';
+
+  return (
+    <div style={{width:'100%',height:'100%',background:S1,overflowY:'auto'}} className="scroll">
+      <StatusBar/>
+      <div style={{padding:'8px 24px 40px'}}>
+        <div style={{marginBottom:24}}>
+          <div style={{fontSize:11,color:T3,fontWeight:700,textTransform:'uppercase',letterSpacing:1,marginBottom:6}}>{isStu?'Student Portal':'Business Portal'}</div>
+          <div style={{fontSize:28,fontWeight:900,color:T1,letterSpacing:-0.5}}>{step==='login'?'Welcome back':'Create account'}</div>
+        </div>
+        <div style={{display:'flex',flexDirection:'column',gap:14}}>
+          {step==='register'&&isStu&&<>
+            <Field label="Username" placeholder="@tigerexplorer" val={form.username} onChange={v=>setForm({...form,username:v})}/>
+            <div>
+              <div style={{fontSize:11,fontWeight:700,color:T3,marginBottom:6,textTransform:'uppercase',letterSpacing:0.8}}>Classification</div>
+              <select value={form.year} onChange={e=>setForm({...form,year:e.target.value})}
+                style={{width:'100%',padding:'14px 16px',background:BG,border:`1.5px solid ${BD}`,borderRadius:14,fontSize:15,color:form.year?T1:T3,outline:'none',appearance:'none'}}>
+                <option value="">Select your year</option>
+                {['Freshman','Sophomore','Junior','Senior','Graduate Student'].map(y=><option key={y}>{y}</option>)}
+              </select>
+            </div>
+            <Field label="Phone" placeholder="+1 (334) 000-0000" type="tel" val={form.phone} onChange={v=>setForm({...form,phone:v})}/>
+          </>}
+          <Field label={isStu?'School Email':'Business Email'} placeholder={isStu?'your.name@tuskegee.edu':'owner@business.com'} type="email" val={form.email} onChange={v=>setForm({...form,email:v})}/>
+          <Field label="Password" placeholder="••••••••" type="password" val={form.pw} onChange={v=>setForm({...form,pw:v})}/>
+        </div>
+        <button onClick={onLogin} style={{marginTop:22,width:'100%',padding:'16px',background:C,border:'none',borderRadius:30,color:'#FFF',fontSize:16,fontWeight:800,cursor:'pointer',boxShadow:`0 6px 24px rgba(212,32,32,0.32)`,letterSpacing:0.2}}>
+          {step==='login'?'Sign in →':'Create account →'}
+        </button>
+        <div onClick={()=>setStep(step==='login'?'register':'login')}
+          style={{textAlign:'center',marginTop:16,fontSize:14,color:C,cursor:'pointer',fontWeight:600}}>
+          {step==='login'?"New to TTN? Create account":"Already have an account? Sign in"}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Tab Bar ──────────────────────────────────────────────────────────────────
+const TABS = [
+  {id:'home',       icon:'🏠',label:'Home'},
+  {id:'map',        icon:'🗺️',label:'Map'},
+  {id:'challenges', icon:'⚡',label:'Quests'},
+  {id:'leaderboard',icon:'🏆',label:'Ranks'},
+  {id:'rewards',    icon:'🎁',label:'Rewards'},
+  {id:'profile',    icon:'👤',label:'Profile'},
+];
+
+function TabBar({active,onChange}) {
+  return (
+    <div style={{position:'absolute',bottom:0,left:0,right:0,height:82,background:S1,borderTop:`1px solid ${BD}`,display:'flex',alignItems:'flex-start',paddingTop:10,zIndex:200,boxShadow:'0 -2px 12px rgba(0,0,0,0.06)'}}>
+      {TABS.map(t=>{
+        const on=active===t.id;
+        return (
+          <button key={t.id} onClick={()=>onChange(t.id)} style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',background:'none',border:'none',cursor:'pointer',padding:'0 2px',position:'relative'}}>
+            {on&&<div style={{position:'absolute',top:-10,width:20,height:2.5,borderRadius:2,background:C}}/>}
+            <div style={{fontSize:19,marginBottom:3,filter:on?'none':'grayscale(1) opacity(0.4)'}}>{t.icon}</div>
+            <div style={{fontSize:9,fontWeight:700,color:on?C:T3,letterSpacing:0.2}}>{t.label}</div>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+// ─── Home ─────────────────────────────────────────────────────────────────────
+function HomeTab() {
+  const pts=1540, nextPts=2500;
+  const pct=Math.round((pts/nextPts)*100);
+  return (
+    <div style={{height:'100%',overflowY:'auto',background:BG}} className="scroll">
+      {/* White top bar */}
+      <div style={{background:S1,borderBottom:`1px solid ${BD}`,padding:'0 20px 18px'}}>
+        <StatusBar/>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginTop:6}}>
+          <div>
+            <div style={{fontSize:13,color:T2}}>Good morning,</div>
+            <div style={{fontSize:23,fontWeight:900,color:T1,letterSpacing:-0.4}}>Tiger Explorer 🐯</div>
+          </div>
+          <div style={{position:'relative'}}>
+            <div style={{width:44,height:44,borderRadius:'50%',background:BG,border:`1.5px solid ${BD}`,display:'flex',alignItems:'center',justifyContent:'center',fontSize:22}}>😊</div>
+            <div style={{position:'absolute',top:-2,right:-2,width:14,height:14,borderRadius:'50%',background:'#FF3B30',border:`2px solid ${S1}`,display:'flex',alignItems:'center',justifyContent:'center',fontSize:7,color:'#FFF',fontWeight:900}}>3</div>
+          </div>
+        </div>
+
+        {/* Progress card */}
+        <div style={{marginTop:16,background:BG,borderRadius:16,padding:'14px 16px',border:`1px solid ${BD}`}}>
+          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10}}>
+            <span style={{fontSize:12,color:T2,fontWeight:600}}>Progress to Gold</span>
+            <div style={{display:'flex',gap:6}}>
+              <Pill bg={GL} col='#9A7810'>🥈 Silver</Pill>
+              <Pill bg='#FFF0F0' col={DC}>#3 🏆</Pill>
+            </div>
+          </div>
+          <div style={{height:6,background:BD,borderRadius:3,overflow:'hidden',marginBottom:6}}>
+            <div style={{height:'100%',width:`${pct}%`,background:`linear-gradient(90deg,${C},${G})`,borderRadius:3}}/>
+          </div>
+          <div style={{display:'flex',justifyContent:'space-between',fontSize:11,color:T3}}>
+            <span>Silver</span>
+            <span style={{color:T2,fontWeight:600}}>1,540 pts · 960 to Gold</span>
+            <span>Gold</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Stories */}
+      <div style={{paddingTop:20}}>
+        <SH2 title="Meet the Community" action="See all"/>
+        <div style={{display:'flex',gap:10,padding:'0 20px',overflowX:'auto',paddingBottom:4}} className="scroll">
+          {STORIES.map(s=>(
+            <div key={s.id} style={{flexShrink:0,cursor:'pointer',width:100}}>
+              {/* Rectangular video thumbnail */}
+              <div style={{width:100,height:148,borderRadius:14,background:`linear-gradient(160deg,${s.bg1} 0%,${s.bg2} 100%)`,position:'relative',overflow:'hidden',boxShadow:`0 4px 14px ${s.accent}40`}}>
+                {/* Colored top-edge indicator (new story) */}
+                <div style={{position:'absolute',top:0,left:0,right:0,height:3,background:s.accent,borderRadius:'14px 14px 0 0'}}/>
+                {/* Subtle top vignette */}
+                <div style={{position:'absolute',top:0,left:0,right:0,height:50,background:'linear-gradient(rgba(0,0,0,0.28),transparent)'}}/>
+                {/* Video camera badge */}
+                <div style={{position:'absolute',top:9,left:9,fontSize:11,background:'rgba(0,0,0,0.38)',borderRadius:6,padding:'2px 5px',color:'#FFF',fontWeight:700,letterSpacing:0.2}}>🎥</div>
+                {/* Avatar centered */}
+                <div style={{position:'absolute',top:'50%',left:'50%',transform:'translate(-50%,-55%)',fontSize:46,lineHeight:1,userSelect:'none'}}>{s.av}</div>
+                {/* Bottom gradient + play button */}
+                <div style={{position:'absolute',bottom:0,left:0,right:0,height:52,background:'linear-gradient(transparent,rgba(0,0,0,0.55))'}}/>
+                <div style={{position:'absolute',bottom:8,right:8,width:24,height:24,borderRadius:'50%',background:'rgba(255,255,255,0.88)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:9,paddingLeft:2}}>▶</div>
+              </div>
+              {/* Text below */}
+              <div style={{marginTop:8,paddingRight:4}}>
+                <div style={{fontSize:12,fontWeight:800,color:T1,lineHeight:1.2}}>Meet {s.meet}</div>
+                <div style={{fontSize:10,color:T2,marginTop:2,lineHeight:1.3}}>{s.biz}</div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Active challenges */}
+      <div style={{padding:'22px 20px 0'}}>
+        <SH2 title="🔥 Active Challenges" action="View all"/>
+        <div style={{display:'flex',flexDirection:'column',gap:10}}>
+          {CHALLENGES.filter(c=>c.active).map(ch=><LocationChallengeCard key={ch.id} ch={ch}/>)}
+        </div>
+      </div>
+
+      {/* Coming up */}
+      <div style={{padding:'22px 20px 100px'}}>
+        <SH2 title="Coming Up"/>
+        <div style={{display:'flex',gap:10,overflowX:'auto',paddingBottom:4}} className="scroll">
+          {CHALLENGES.filter(c=>!c.active).map(ch=>(
+            <div key={ch.id} style={{flexShrink:0,width:148,background:S1,borderRadius:16,padding:14,boxShadow:SH,cursor:'pointer'}}>
+              <div style={{fontSize:30,marginBottom:8}}>{ch.icon}</div>
+              <div style={{fontSize:13,fontWeight:700,color:T1,lineHeight:1.3}}>{ch.title}</div>
+              <div style={{fontSize:11,color:T2,marginTop:2}}>{ch.expires}</div>
+              <div style={{marginTop:8,background:GL,color:'#9A7810',borderRadius:8,padding:'3px 9px',fontSize:11,fontWeight:700,display:'inline-block'}}>+{ch.pts} pts</div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function SH2({title,action}) {
+  return (
+    <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:12,padding:'0 20px'}}>
+      <div style={{fontSize:16,fontWeight:800,color:T1,letterSpacing:-0.2}}>{title}</div>
+      {action&&<div style={{fontSize:13,color:C,fontWeight:600,cursor:'pointer'}}>{action}</div>}
+    </div>
+  );
+}
+
+const PHOTO_CFG = {
+  food:    {bg1:'#B03A00',bg2:'#E8722A',pat1:'#C85010',pat2:'#FF9A5A'},
+  history: {bg1:'#5C0E0E',bg2:'#A83030',pat1:'#8B1A1A',pat2:'#C04040'},
+  farm:    {bg1:'#1A4A1E',bg2:'#4A9E52',pat1:'#2E7D32',pat2:'#76C442'},
+  arts:    {bg1:'#3A0060',bg2:'#9040B8',pat1:'#6A1B9A',pat2:'#BA68C8'},
+};
+
+function LocationChallengeCard({ch}) {
+  const pc = PHOTO_CFG[ch.type] || {bg1:DC,bg2:C,pat1:C,pat2:'#FF6060'};
+  const trail = TRAILS[ch.type];
+  return (
+    <div style={{background:S1,borderRadius:20,overflow:'hidden',boxShadow:SH,cursor:'pointer'}}>
+      {/* ── Photo banner ── */}
+      <div style={{position:'relative',height:168,background:`linear-gradient(145deg,${pc.bg1} 0%,${pc.bg2} 100%)`,overflow:'hidden'}}>
+        {/* Background texture */}
+        <svg style={{position:'absolute',top:0,left:0,width:'100%',height:'100%',opacity:0.18}} viewBox="0 0 350 168" preserveAspectRatio="xMidYMid slice">
+          <circle cx="280" cy="30" r="80" fill={pc.pat2}/>
+          <circle cx="60" cy="140" r="55" fill={pc.pat1}/>
+          <circle cx="175" cy="84" r="40" fill={pc.pat2} opacity="0.5"/>
+        </svg>
+        {/* Big icon watermark */}
+        <div style={{position:'absolute',right:12,top:'50%',transform:'translateY(-50%)',fontSize:88,opacity:0.13,userSelect:'none',lineHeight:1}}>{ch.icon}</div>
+        {/* Bottom gradient for text legibility */}
+        <div style={{position:'absolute',bottom:0,left:0,right:0,height:72,background:'linear-gradient(transparent,rgba(0,0,0,0.62))'}}/>
+        {/* Location label */}
+        <div style={{position:'absolute',bottom:11,left:12,display:'flex',alignItems:'center',gap:5}}>
+          <span style={{fontSize:11,lineHeight:1}}>📍</span>
+          <span style={{fontSize:13,color:'#FFF',fontWeight:600,textShadow:'0 1px 4px rgba(0,0,0,0.4)'}}>{ch.biz}</span>
+        </div>
+        {/* Participant count */}
+        <div style={{position:'absolute',bottom:10,right:12,display:'flex',alignItems:'center',gap:5}}>
+          <span style={{fontSize:14,lineHeight:1}}>👥</span>
+          <span style={{fontSize:13,color:'#FFF',fontWeight:600,textShadow:'0 1px 4px rgba(0,0,0,0.4)'}}>{ch.participants}</span>
+        </div>
+      </div>
+
+      {/* ── Content ── */}
+      <div style={{padding:'14px 16px 16px'}}>
+        <div style={{fontSize:16,fontWeight:800,color:T1,letterSpacing:-0.3,lineHeight:1.3,marginBottom:4}}>{ch.title}</div>
+        <div style={{fontSize:13,color:T2,lineHeight:1.45,marginBottom:13}}>{ch.desc}</div>
+        <div style={{display:'flex',gap:7,flexWrap:'wrap',alignItems:'center'}}>
+          <Pill bg='#F5ECD5' col='#7A5C10'>{trail?.icon} {trail?.name}</Pill>
+          <Pill bg='#E9F5E9' col='#2A6830'>+{ch.pts} pts</Pill>
+          <Pill bg={T1} col='#FFF'>Until {ch.deadline}</Pill>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Map ──────────────────────────────────────────────────────────────────────
+function MapTab() {
+  const [trail, setTrail] = useState('all');
+  const [sel, setSel] = useState(null);
+  const [mapReady, setMapReady] = useState(false);
+  const mapDivRef = useRef(null);
+  const leafletRef = useRef(null);
+  const markersRef = useRef([]);
+
+  // Init Leaflet once on mount
+  useEffect(() => {
+    if (!mapDivRef.current || leafletRef.current || !window.L) return;
+    const map = window.L.map(mapDivRef.current, {
+      zoomControl: false,
+      attributionControl: false,
+    });
+    window.L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19,
+    }).addTo(map);
+    // Fit all 8 confirmed locations
+    const bounds = window.L.latLngBounds(ALL_LOCS.map(l => [l.lat, l.lng]));
+    map.fitBounds(bounds, { padding: [52, 52] });
+    leafletRef.current = map;
+    setMapReady(true);
+    return () => { map.remove(); leafletRef.current = null; };
+  }, []);
+
+  // Rebuild markers when trail filter changes or map becomes ready
+  useEffect(() => {
+    const map = leafletRef.current;
+    if (!map) return;
+    markersRef.current.forEach(m => map.removeLayer(m));
+    markersRef.current = [];
+    const locs = trail === 'all' ? ALL_LOCS : ALL_LOCS.filter(l => l.trailKey === trail);
+    locs.forEach(loc => {
+      const col = loc.visited ? loc.trail.color : '#888888';
+      const markerHtml = `<div style="width:36px;height:36px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);background:${col};display:flex;align-items:center;justify-content:center;box-shadow:0 3px 14px rgba(0,0,0,0.30);border:2.5px solid white"><span style="transform:rotate(45deg);font-size:15px;line-height:1">${loc.visited ? loc.trail.icon : '🔒'}</span></div>`;
+      const icon = window.L.divIcon({ html: markerHtml, className: '', iconSize: [36, 36], iconAnchor: [18, 36] });
+      const m = window.L.marker([loc.lat, loc.lng], { icon })
+        .addTo(map)
+        .on('click', () => setSel(prev => prev?.id === loc.id ? null : loc));
+      markersRef.current.push(m);
+    });
+  }, [trail, mapReady]);
+
+  const vis = ALL_LOCS.filter(l => l.visited).length;
+
+  return (
+    <div style={{height:'100%',display:'flex',flexDirection:'column'}}>
+      <div style={{background:S1,borderBottom:`1px solid ${BD}`,padding:'0 20px 14px'}}>
+        <StatusBar/>
+        <div style={{fontSize:22,fontWeight:900,color:T1,letterSpacing:-0.3}}>Explore 🗺️</div>
+        <div style={{fontSize:13,color:T2,marginTop:2}}>{vis}/{ALL_LOCS.length} locations discovered</div>
+        <div style={{marginTop:10,height:5,background:BG,borderRadius:3,overflow:'hidden'}}>
+          <div style={{height:'100%',width:`${(vis/ALL_LOCS.length)*100}%`,background:`linear-gradient(90deg,${C},${G})`,borderRadius:3}}/>
+        </div>
+      </div>
+
+      <div style={{display:'flex',gap:8,padding:'10px 14px',overflowX:'auto',background:S1,borderBottom:`1px solid ${BD}`}} className="scroll">
+        {[['all','🗺️','All'],...Object.entries(TRAILS).map(([k,t])=>[k,t.icon,t.name.replace(' Trail','')])].map(([k,ic,nm])=>{
+          const on=trail===k;
+          const col=k==='all'?C:TRAILS[k]?.color||C;
+          return (
+            <button key={k} onClick={()=>{setTrail(k);setSel(null);}} style={{flexShrink:0,padding:'7px 14px',borderRadius:20,border:`1px solid ${on?col:BD}`,background:on?`${col}15`:S1,color:on?col:T2,fontSize:12,fontWeight:700,cursor:'pointer',transition:'all 0.2s'}}>
+              {ic} {nm}
+            </button>
+          );
+        })}
+      </div>
+
+      <div style={{flex:1,position:'relative',overflow:'hidden'}}>
+        <div ref={mapDivRef} style={{width:'100%',height:'100%'}}/>
+        {sel && (
+          <div style={{position:'absolute',bottom:14,left:14,right:14,background:S1,borderRadius:22,padding:18,boxShadow:'0 12px 40px rgba(0,0,0,0.22)',animation:'fadeUp 0.25s cubic-bezier(0.22,1,0.36,1) both',zIndex:1000}}>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start'}}>
+              <div style={{flex:1}}>
+                <div style={{display:'flex',gap:8,alignItems:'center',marginBottom:4}}>
+                  <span style={{fontSize:20}}>{sel.trail.icon}</span>
+                  <span style={{fontSize:16,fontWeight:800,color:T1}}>{sel.name}</span>
+                </div>
+                <div style={{fontSize:13,color:T2,marginBottom:10}}>{sel.desc}</div>
+                <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
+                  {sel.visited
+                    ? <><Pill bg='#E8F5E9' col='#2E7D32'>✓ Visited</Pill><Pill bg={GL} col='#9A7810'>+{sel.pts} pts earned</Pill></>
+                    : <Pill bg='#FFF3E0' col='#BF360C'>🔒 Visit to unlock · +{sel.pts} pts</Pill>
+                  }
+                </div>
+              </div>
+              <button onClick={()=>setSel(null)} style={{background:BG,border:'none',width:28,height:28,borderRadius:'50%',cursor:'pointer',fontSize:13,color:T2,flexShrink:0,marginLeft:8}}>✕</button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── Challenges ───────────────────────────────────────────────────────────────
+function ChallengesTab() {
+  const [filter,setFilter]=useState('all');
+  const shown=filter==='all'?CHALLENGES:CHALLENGES.filter(c=>c.type===filter);
+  return (
+    <div style={{height:'100%',overflowY:'auto',background:BG}} className="scroll">
+      <div style={{background:S1,borderBottom:`1px solid ${BD}`,padding:'0 20px 14px'}}>
+        <StatusBar/>
+        <div style={{fontSize:22,fontWeight:900,color:T1,letterSpacing:-0.3}}>Challenges ⚡</div>
+        <div style={{fontSize:13,color:T2,marginTop:2}}>Complete to earn points & badges</div>
+      </div>
+
+      <div style={{display:'flex',gap:8,padding:'10px 14px',overflowX:'auto',background:S1,borderBottom:`1px solid ${BD}`}} className="scroll">
+        {[['all','⚡ All'],['food','🍽️ Food'],['farm','🌾 Farm'],['history','🏛️ History'],['arts','🎨 Arts']].map(([k,l])=>(
+          <button key={k} onClick={()=>setFilter(k)} style={{flexShrink:0,padding:'7px 14px',borderRadius:20,border:`1px solid ${filter===k?C:BD}`,background:filter===k?`${C}12`:S1,color:filter===k?C:T2,fontSize:12,fontWeight:700,cursor:'pointer'}}>
+            {l}
+          </button>
+        ))}
+      </div>
+
+      <div style={{margin:'14px 20px 0',background:S1,borderRadius:18,padding:'14px 16px',boxShadow:SH,display:'flex',gap:12,alignItems:'center',border:`1px solid ${C}18`}}>
+        <div style={{width:40,height:40,borderRadius:12,background:`${C}15`,display:'flex',alignItems:'center',justifyContent:'center',fontSize:22}}>⚡</div>
+        <div>
+          <div style={{fontSize:15,fontWeight:800,color:T1}}>{CHALLENGES.filter(c=>c.active).length} Active Challenges</div>
+          <div style={{fontSize:12,color:T2}}>Earn up to 300 bonus pts this week</div>
+        </div>
+      </div>
+
+      <div style={{padding:'12px 20px 100px',display:'flex',flexDirection:'column',gap:12}}>
+        {shown.map(ch=>{
+          const tc=TRAILS[ch.type]?.color||C;
+          return (
+            <div key={ch.id} style={{background:S1,borderRadius:20,padding:16,boxShadow:SH,opacity:ch.active?1:0.8,cursor:'pointer'}}>
+              <div style={{display:'flex',gap:14,alignItems:'flex-start'}}>
+                <div style={{width:56,height:56,borderRadius:16,background:`${tc}15`,border:`1px solid ${tc}20`,display:'flex',alignItems:'center',justifyContent:'center',fontSize:28,flexShrink:0}}>{ch.icon}</div>
+                <div style={{flex:1}}>
+                  <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start'}}>
+                    <div style={{fontSize:15,fontWeight:800,color:T1,lineHeight:1.25,maxWidth:200}}>{ch.title}</div>
+                    {ch.active&&<span style={{background:`${C}15`,color:C,borderRadius:8,padding:'2px 7px',fontSize:10,fontWeight:800,flexShrink:0,marginLeft:6}}>LIVE</span>}
+                  </div>
+                  <div style={{fontSize:12,color:T2,marginTop:3}}>{ch.biz}</div>
+                  <div style={{display:'flex',gap:7,marginTop:9,flexWrap:'wrap',alignItems:'center'}}>
+                    <Pill bg={GL} col='#9A7810'>+{ch.pts} pts</Pill>
+                    <span style={{fontSize:11,color:T3}}>⏰ {ch.expires}</span>
+                    <span style={{fontSize:15}}>{ch.badge}</span>
+                  </div>
+                </div>
+              </div>
+              {ch.active&&(
+                <button style={{width:'100%',marginTop:14,background:C,color:'#FFF',border:'none',borderRadius:30,padding:'13px',fontSize:14,fontWeight:800,cursor:'pointer',boxShadow:`0 4px 16px rgba(212,32,32,0.28)`,letterSpacing:0.2}}>
+                  Accept Challenge →
+                </button>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ─── Leaderboard ──────────────────────────────────────────────────────────────
+function LeaderboardTab() {
+  const [period,setPeriod]=useState('weekly');
+  const [friends,setFriends]=useState(false);
+  const data=LB[period];
+  const shown=friends?data.filter(u=>u.me||[1,4].includes(u.rank)):data;
+  const medals={1:G,2:'#AAAAAA',3:'#C27A3A'};
+
+  return (
+    <div style={{height:'100%',overflowY:'auto',background:BG}} className="scroll">
+      <div style={{background:S1,borderBottom:`1px solid ${BD}`,padding:'0 20px 16px'}}>
+        <StatusBar/>
+        <div style={{fontSize:22,fontWeight:900,color:T1,letterSpacing:-0.3}}>Leaderboard 🏆</div>
+        <div style={{fontSize:13,color:T2,marginTop:2}}>Compete with your peers</div>
+        <div style={{display:'flex',gap:4,marginTop:14,background:BG,borderRadius:12,padding:4}}>
+          {[['weekly','Weekly'],['monthly','Monthly'],['allTime','All Time']].map(([k,l])=>(
+            <button key={k} onClick={()=>setPeriod(k)} style={{flex:1,padding:'9px 4px',border:'none',borderRadius:8,background:period===k?S1:'transparent',color:period===k?C:T2,fontSize:12,fontWeight:700,cursor:'pointer',transition:'all 0.2s',boxShadow:period===k?SH:undefined}}>
+              {l}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {!friends&&data.length>=3&&(
+        <div style={{background:S1,padding:'22px 20px 12px',display:'flex',alignItems:'flex-end',justifyContent:'center',gap:10,borderBottom:`1px solid ${BD}`}}>
+          <PodiumItem user={data[1]} rank={2} height={76}/>
+          <PodiumItem user={data[0]} rank={1} height={104} crown/>
+          <PodiumItem user={data[2]} rank={3} height={60}/>
+        </div>
+      )}
+
+      <div style={{padding:'10px 20px 6px',display:'flex',justifyContent:'flex-end'}}>
+        <button onClick={()=>setFriends(!friends)} style={{background:friends?`${C}12`:S1,color:friends?C:T2,border:`1px solid ${friends?C:BD}`,borderRadius:20,padding:'6px 14px',fontSize:12,fontWeight:700,cursor:'pointer',boxShadow:SH}}>
+          {friends?'👥 Friends Only':'👥 Friends'}
+        </button>
+      </div>
+
+      <div style={{padding:'6px 20px 100px',display:'flex',flexDirection:'column',gap:8}}>
+        {shown.map(u=>(
+          <div key={`${period}-${u.rank}`} style={{background:u.me?`${GL}`:S1,borderRadius:16,padding:'12px 14px',display:'flex',alignItems:'center',gap:12,boxShadow:SH,border:u.me?`1px solid ${G}30`:undefined}}>
+            <div style={{width:32,height:32,borderRadius:'50%',background:medals[u.rank]||(u.me?`${GL}`:`${BG}`),display:'flex',alignItems:'center',justifyContent:'center',fontSize:13,fontWeight:900,color:u.rank<=3?'#FFF':T2,flexShrink:0}}>{u.rank}</div>
+            <div style={{width:38,height:38,borderRadius:'50%',background:BG,display:'flex',alignItems:'center',justifyContent:'center',fontSize:20,flexShrink:0}}>{u.av}</div>
+            <div style={{flex:1}}>
+              <div style={{fontSize:14,fontWeight:800,color:u.me?DC:T1}}>{u.name}{u.me?' (You)':''}</div>
+              <div style={{fontSize:11,color:T2}}>{u.yr}</div>
+            </div>
+            <div style={{textAlign:'right'}}>
+              <div style={{fontSize:15,fontWeight:900,color:u.me?DC:T1}}>{u.pts.toLocaleString()}</div>
+              <div style={{fontSize:11,color:T3}}>{u.badges} badges</div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function PodiumItem({user,rank,height,crown}) {
+  const bg={1:G,2:'#BBBBBB',3:'#C27A3A'}[rank];
+  return (
+    <div style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center'}}>
+      {crown&&<div style={{fontSize:16,marginBottom:2}}>👑</div>}
+      <div style={{fontSize:rank===1?36:28,marginBottom:3}}>{user.av}</div>
+      <div style={{fontSize:10,fontWeight:800,color:user.me?DC:T1,textAlign:'center',maxWidth:76,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{user.name}</div>
+      <div style={{width:'100%',background:bg,borderRadius:'10px 10px 0 0',padding:`${rank===1?14:10}px 4px`,marginTop:6,textAlign:'center'}}>
+        <div style={{fontSize:rank===1?22:17}}>{['🥇','🥈','🥉'][rank-1]}</div>
+        <div style={{fontSize:10,fontWeight:900,color:'#FFF',marginTop:1}}>{user.pts.toLocaleString()}</div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Rewards ──────────────────────────────────────────────────────────────────
+function RewardsTab() {
+  const [tab,setTab]=useState('tiers');
+  const pts=1540;
+  const cur=TIERS.find(t=>pts>=t.min&&pts<=t.max);
+  const nxt=TIERS[TIERS.indexOf(cur)+1];
+  const pct=nxt?Math.round(((pts-cur.min)/(nxt.min-cur.min))*100):100;
+
+  return (
+    <div style={{height:'100%',overflowY:'auto',background:BG}} className="scroll">
+      {/* Balance header — white surface */}
+      <div style={{background:S1,borderBottom:`1px solid ${BD}`,padding:'0 20px 20px'}}>
+        <StatusBar/>
+        <div style={{fontSize:11,color:T3,fontWeight:700,textTransform:'uppercase',letterSpacing:1,marginBottom:6}}>Your Balance</div>
+        <div style={{display:'flex',alignItems:'baseline',gap:8,marginBottom:8}}>
+          <div style={{fontSize:54,fontWeight:900,color:T1,fontFamily:'Georgia,serif',letterSpacing:-2,lineHeight:1}}>1,540</div>
+          <div style={{fontSize:15,color:T3,fontWeight:500,paddingBottom:4}}>points</div>
+        </div>
+        <Pill bg={GL} col='#9A7810'>🥈 Silver Tier</Pill>
+        {nxt&&<div style={{marginTop:14}}>
+          <div style={{display:'flex',justifyContent:'space-between',fontSize:11,color:T3,marginBottom:6}}>
+            <span>{cur?.tier}</span><span style={{color:T2,fontWeight:600}}>{(nxt.min-pts).toLocaleString()} pts to {nxt.tier}</span><span>{nxt.tier}</span>
+          </div>
+          <div style={{height:5,background:BG,borderRadius:3,overflow:'hidden'}}>
+            <div style={{height:'100%',width:`${pct}%`,background:`linear-gradient(90deg,${C},${G})`,borderRadius:3}}/>
+          </div>
+        </div>}
+      </div>
+
+      {/* Sub tabs */}
+      <div style={{display:'flex',background:S1,borderBottom:`1px solid ${BD}`}}>
+        {[['tiers','🏅 Tiers'],['redeem','🎫 Redeem'],['history','📋 History']].map(([k,l])=>(
+          <button key={k} onClick={()=>setTab(k)} style={{flex:1,padding:'13px 8px',border:'none',borderBottom:tab===k?`2.5px solid ${C}`:'2.5px solid transparent',background:'transparent',color:tab===k?C:T3,fontSize:12,fontWeight:700,cursor:'pointer',transition:'color 0.2s'}}>
+            {l}
+          </button>
+        ))}
+      </div>
+
+      {tab==='tiers'&&(
+        <div style={{padding:'14px 20px 100px',display:'flex',flexDirection:'column',gap:10}}>
+          {TIERS.map(t=>{
+            const on=pts>=t.min, curr=t===cur;
+            return (
+              <div key={t.tier} style={{background:S1,borderRadius:18,border:curr?`1.5px solid ${t.col}40`:`1px solid ${BD}`,padding:16,boxShadow:SH,opacity:on?1:0.55}}>
+                <div style={{display:'flex',alignItems:'center',gap:12,marginBottom:10}}>
+                  <div style={{width:44,height:44,borderRadius:'50%',background:on?`${t.col}18`:BG,display:'flex',alignItems:'center',justifyContent:'center',fontSize:24}}>{t.icon}</div>
+                  <div style={{flex:1}}>
+                    <div style={{fontSize:15,fontWeight:800,color:curr?t.col:T1}}>{t.tier} {curr&&<span style={{fontSize:11,color:T3,fontWeight:500}}>← current</span>}</div>
+                    <div style={{fontSize:11,color:T3}}>{t.max===Infinity?`${t.min.toLocaleString()}+ pts`:`${t.min.toLocaleString()} – ${t.max.toLocaleString()} pts`}</div>
+                  </div>
+                  {on&&<span>✅</span>}
+                </div>
+                <div style={{display:'flex',flexWrap:'wrap',gap:6}}>
+                  {t.rewards.map((r,i)=><span key={i} style={{background:on?`${t.col}12`:BG,color:on?T1:T3,borderRadius:8,padding:'4px 10px',fontSize:11}}>{r}</span>)}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {tab==='redeem'&&(
+        /* Airbnb listing-style rows */
+        <div style={{padding:'14px 20px 100px',display:'flex',flexDirection:'column',gap:10}}>
+          {[
+            {name:'Bookstore Discount (20%)',cost:500,icon:'📚',partner:'TU Bookstore'},
+            {name:'Free Campus Meal',cost:300,icon:'🍽️',partner:'Tiger Dining'},
+            {name:'Restaurant Gift Card ($5)',cost:800,icon:'🎫',partner:"Mama's Kitchen"},
+            {name:'Campus Store Voucher ($10)',cost:1000,icon:'🛍️',partner:'TU Campus Store'},
+          ].map((item,i)=>(
+            <div key={i} style={{background:S1,borderRadius:16,padding:14,display:'flex',gap:14,alignItems:'center',boxShadow:SH}}>
+              <div style={{width:52,height:52,borderRadius:14,background:GL,display:'flex',alignItems:'center',justifyContent:'center',fontSize:26}}>{item.icon}</div>
+              <div style={{flex:1}}>
+                <div style={{fontSize:14,fontWeight:700,color:T1}}>{item.name}</div>
+                <div style={{fontSize:12,color:T2}}>{item.partner}</div>
+              </div>
+              <button style={{background:pts>=item.cost?C:'#EEE',color:pts>=item.cost?'#FFF':T3,border:'none',borderRadius:26,padding:'9px 14px',cursor:'pointer',fontSize:12,fontWeight:800,whiteSpace:'nowrap',boxShadow:pts>=item.cost?`0 3px 12px rgba(212,32,32,0.25)`:undefined}}>
+                {item.cost} pts
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {tab==='history'&&(
+        <div style={{padding:'14px 20px 100px',display:'flex',flexDirection:'column',gap:8}}>
+          {[
+            {act:'Visited The Golden Fork',  pts:50,  date:'Today',    icon:'🍽️',earn:true},
+            {act:'Completed Food Challenge', pts:150, date:'Yesterday',icon:'🔥',earn:true},
+            {act:'Visited Heritage Farm',    pts:60,  date:'May 19',   icon:'🌾',earn:true},
+            {act:'Redeemed Bookstore Discount',pts:-300,date:'May 18', icon:'📚',earn:false},
+            {act:'Visited Art Gallery',      pts:65,  date:'May 17',   icon:'🎨',earn:true},
+          ].map((item,i)=>(
+            <div key={i} style={{background:S1,borderRadius:14,padding:'12px 14px',display:'flex',gap:12,alignItems:'center',boxShadow:SH}}>
+              <div style={{fontSize:22}}>{item.icon}</div>
+              <div style={{flex:1}}><div style={{fontSize:13,fontWeight:600,color:T1}}>{item.act}</div><div style={{fontSize:11,color:T2}}>{item.date}</div></div>
+              <div style={{fontSize:15,fontWeight:900,color:item.earn?'#2E7D32':C}}>{item.earn?'+':''}{item.pts}</div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Profile ──────────────────────────────────────────────────────────────────
+function ProfileTab() {
+  return (
+    <div style={{height:'100%',overflowY:'auto',background:BG}} className="scroll">
+      {/* Header */}
+      <div style={{background:S1,borderBottom:`1px solid ${BD}`,padding:'0 20px 24px',textAlign:'center'}}>
+        <StatusBar/>
+        <div style={{width:80,height:80,borderRadius:'50%',background:BG,border:`2px solid ${BD}`,margin:'8px auto 12px',display:'flex',alignItems:'center',justifyContent:'center',fontSize:40,boxShadow:SH}}>😊</div>
+        <div style={{fontSize:22,fontWeight:900,color:T1,letterSpacing:-0.3}}>Tiger Explorer</div>
+        <div style={{fontSize:13,color:T2,marginTop:2}}>@tigerexplorer</div>
+        <div style={{display:'flex',justifyContent:'center',gap:8,marginTop:10}}>
+          <Pill bg={BG} col={T2} border={BD}>🎓 Sophomore</Pill>
+          <Pill bg={GL} col='#9A7810'>🥈 Silver Tier</Pill>
+        </div>
+      </div>
+
+      {/* Stats */}
+      <div style={{background:S1,padding:'16px 8px',display:'flex',justifyContent:'space-around',borderBottom:`1px solid ${BD}`}}>
+        {[['⭐','1,540','Points'],['🏅','6','Badges'],['📍','5/14','Visited'],['🏆','#3','Rank']].map(([ic,v,l])=>(
+          <div key={l} style={{textAlign:'center'}}>
+            <div style={{fontSize:18,marginBottom:3}}>{ic}</div>
+            <div style={{fontSize:18,fontWeight:900,color:C}}>{v}</div>
+            <div style={{fontSize:9,color:T3,fontWeight:700,textTransform:'uppercase',letterSpacing:0.4}}>{l}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Trail progress */}
+      <div style={{padding:'20px 20px 0'}}>
+        <div style={{fontSize:15,fontWeight:800,color:T1,marginBottom:14,letterSpacing:-0.2}}>Trail Progress</div>
+        {Object.entries(TRAILS).map(([k,t])=>{
+          const v=t.locations.filter(l=>l.visited).length,tot=t.locations.length,p=Math.round((v/tot)*100);
+          return (
+            <div key={k} style={{marginBottom:14}}>
+              <div style={{display:'flex',justifyContent:'space-between',fontSize:13,fontWeight:700,marginBottom:6}}>
+                <span style={{color:T1}}>{t.icon} {t.name}</span>
+                <span style={{color:p===100?'#2E7D32':T3}}>{v}/{tot}{p===100?' ✓':''}</span>
+              </div>
+              <div style={{height:5,background:BD,borderRadius:3,overflow:'hidden'}}>
+                <div style={{height:'100%',borderRadius:3,background:p===100?'#2E7D32':t.color,width:`${p}%`,transition:'width 0.6s ease'}}/>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Badges */}
+      <div style={{padding:'20px 20px 0'}}>
+        <div style={{fontSize:15,fontWeight:800,color:T1,marginBottom:14,letterSpacing:-0.2}}>Badges 🏅</div>
+        <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:10}}>
+          {BADGES_DATA.map((b,i)=>(
+            <div key={i} style={{background:S1,borderRadius:14,padding:'12px 6px',textAlign:'center',boxShadow:b.earned?SH:undefined,border:`1px solid ${b.earned?G+'25':BD}`,opacity:b.earned?1:0.45}}>
+              <div style={{fontSize:26,marginBottom:5,filter:b.earned?'none':'grayscale(1)'}}>{b.icon}</div>
+              <div style={{fontSize:9,fontWeight:700,color:b.earned?T1:T3,lineHeight:1.2}}>{b.name}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Settings */}
+      <div style={{padding:'20px 20px 100px'}}>
+        <div style={{fontSize:15,fontWeight:800,color:T1,marginBottom:14,letterSpacing:-0.2}}>Settings</div>
+        <div style={{background:S1,borderRadius:18,overflow:'hidden',boxShadow:SH,border:`1px solid ${BD}`}}>
+          {[
+            {icon:'🔔',label:'Notifications',val:'On'},
+            {icon:'🔒',label:'Privacy',val:'Friends Only'},
+            {icon:'📱',label:'Phone Number',val:'(334) •••-••25'},
+            {icon:'✉️',label:'Email',val:'tiger@tuskegee.edu'},
+            {icon:'❓',label:'Help & Support'},
+            {icon:'🚪',label:'Sign Out',danger:true},
+          ].map((s,i,arr)=>(
+            <div key={i} style={{padding:'14px 16px',display:'flex',alignItems:'center',gap:12,cursor:'pointer',borderBottom:i<arr.length-1?`1px solid ${BD}`:undefined}}>
+              <span style={{fontSize:18}}>{s.icon}</span>
+              <span style={{flex:1,fontSize:14,fontWeight:600,color:s.danger?C:T1}}>{s.label}</span>
+              {s.val&&<span style={{fontSize:12,color:T3}}>{s.val}</span>}
+              <span style={{color:BD,fontSize:16}}>›</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Root ─────────────────────────────────────────────────────────────────────
+function App() {
+  const [screen,setScreen]=useState('splash');
+  const [role,setRole]=useState(null);
+  const [tab,setTab]=useState('home');
+
+  const renderMain=()=>({
+    home:        <HomeTab/>,
+    map:         <MapTab/>,
+    challenges:  <ChallengesTab/>,
+    leaderboard: <LeaderboardTab/>,
+    rewards:     <RewardsTab/>,
+    profile:     <ProfileTab/>,
+  }[tab]||<HomeTab/>);
+
+  return (
+    <div class="screen">
+      {screen==='splash' && <Splash onDone={()=>setScreen('role')}/>}
+      {screen==='role'   && <RoleSelect onPick={r=>{setRole(r);setScreen('login');}}/>}
+      {screen==='login'  && <Login role={role} onLogin={()=>setScreen('main')}/>}
+      {screen==='main'   && (
+        <div style={{width:'100%',height:'100%',position:'relative',background:BG}}>
+          <div style={{height:'calc(100% - 82px)',overflow:'hidden'}}>{renderMain()}</div>
+          <TabBar active={tab} onChange={setTab}/>
+        </div>
+      )}
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>

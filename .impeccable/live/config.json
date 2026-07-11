@@ -1,0 +1,9 @@
+{
+  "files": ["index.html", "sea-mango/index.html"],
+  "framework": "static-html",
+  "insertBefore": "</body>",
+  "commentSyntax": "html",
+  "devServer": "python3 -m http.server 3000 --directory /Users/kendallpowe/ttn-app",
+  "cspChecked": true,
+  "note": "Live mode requires Node.js. Install Node (https://nodejs.org) to use /impeccable live."
+}

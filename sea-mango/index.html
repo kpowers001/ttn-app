@@ -1,0 +1,594 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Project Sea Mango — Graphic</title>
+  <link href="https://fonts.googleapis.com/css2?family=Pinyon+Script&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: repeating-conic-gradient(#bbb 0% 25%, #e8e8e8 0% 50%) 0 0 / 28px 28px;
+      display: flex; flex-direction: column;
+      justify-content: center; align-items: center;
+      min-height: 100vh; gap: 18px; padding: 30px;
+    }
+    .note {
+      font-family: -apple-system, sans-serif; font-size: 12px; color: #444;
+      background: rgba(255,255,255,0.72); padding: 5px 16px; border-radius: 20px;
+    }
+    .btns { display: flex; gap: 10px; }
+    button {
+      font-family: -apple-system, sans-serif; font-size: 13px; font-weight: 600;
+      background: #1a1a2e; color: white; border: none;
+      padding: 10px 24px; border-radius: 8px; cursor: pointer; transition: background .2s;
+    }
+    button:hover { background: #2e2e5e; }
+  </style>
+</head>
+<body>
+  <div class="note">Checkered area = transparent background</div>
+
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+  <!--                  PROJECT SEA MANGO GRAPHIC                        -->
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+  <svg id="design" width="900" height="660" viewBox="0 0 900 660"
+       xmlns="http://www.w3.org/2000/svg">
+    <defs>
+
+      <!-- ── Sea gradient ── -->
+      <radialGradient id="seaFill" cx="50%" cy="50%" r="65%">
+        <stop offset="0%"   stop-color="#1E7A95"/>
+        <stop offset="100%" stop-color="#0D4460"/>
+      </radialGradient>
+
+      <!-- ── Parchment map frame ── -->
+      <linearGradient id="frameG" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%"   stop-color="#D4A830"/>
+        <stop offset="45%"  stop-color="#9B7318"/>
+        <stop offset="100%" stop-color="#D4A830"/>
+      </linearGradient>
+
+      <!-- ── Land ── -->
+      <radialGradient id="landG" cx="40%" cy="35%" r="70%">
+        <stop offset="0%"   stop-color="#E8CD82"/>
+        <stop offset="100%" stop-color="#C4A04A"/>
+      </radialGradient>
+
+      <!-- ── Ruby ── -->
+      <radialGradient id="rubyG" cx="28%" cy="22%" r="72%">
+        <stop offset="0%"   stop-color="#FF9090"/>
+        <stop offset="52%"  stop-color="#CC1818"/>
+        <stop offset="100%" stop-color="#620808"/>
+      </radialGradient>
+
+      <!-- ── Emerald ── -->
+      <radialGradient id="emG" cx="28%" cy="22%" r="72%">
+        <stop offset="0%"   stop-color="#88FFB4"/>
+        <stop offset="52%"  stop-color="#0F9D4A"/>
+        <stop offset="100%" stop-color="#044822"/>
+      </radialGradient>
+
+      <!-- ── Sapphire ── -->
+      <radialGradient id="sapG" cx="28%" cy="22%" r="72%">
+        <stop offset="0%"   stop-color="#90CCFF"/>
+        <stop offset="52%"  stop-color="#1255BF"/>
+        <stop offset="100%" stop-color="#062560"/>
+      </radialGradient>
+
+      <!-- ── Amethyst ── -->
+      <radialGradient id="amG" cx="28%" cy="22%" r="72%">
+        <stop offset="0%"   stop-color="#DCA8FF"/>
+        <stop offset="52%"  stop-color="#7A18A8"/>
+        <stop offset="100%" stop-color="#360060"/>
+      </radialGradient>
+
+      <!-- ── Pearl ── -->
+      <radialGradient id="pearlG" cx="32%" cy="26%" r="72%">
+        <stop offset="0%"   stop-color="#FFFFFF"/>
+        <stop offset="55%"  stop-color="#DDD0EE"/>
+        <stop offset="100%" stop-color="#9A88B8"/>
+      </radialGradient>
+
+      <!-- ── Gold ── -->
+      <linearGradient id="goldG" x1="15%" y1="10%" x2="85%" y2="90%">
+        <stop offset="0%"   stop-color="#FFE566"/>
+        <stop offset="50%"  stop-color="#E8A608"/>
+        <stop offset="100%" stop-color="#9A6206"/>
+      </linearGradient>
+
+      <!-- ── Chest wood ── -->
+      <linearGradient id="woodG" x1="0%" y1="0%" x2="0%" y2="100%">
+        <stop offset="0%"   stop-color="#9E6C18"/>
+        <stop offset="100%" stop-color="#4C2A04"/>
+      </linearGradient>
+
+      <!-- ── Mango ── -->
+      <radialGradient id="mangoG" cx="38%" cy="28%" r="72%">
+        <stop offset="0%"   stop-color="#FFE960"/>
+        <stop offset="42%"  stop-color="#FF9A0A"/>
+        <stop offset="100%" stop-color="#C05200"/>
+      </radialGradient>
+
+      <!-- ── Filters ── -->
+      <filter id="gemGlow" x="-50%" y="-50%" width="200%" height="200%">
+        <feGaussianBlur in="SourceGraphic" stdDeviation="6" result="b"/>
+        <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+      </filter>
+      <filter id="mapShadow" x="-8%" y="-8%" width="116%" height="116%">
+        <feDropShadow dx="3" dy="6" stdDeviation="8" flood-color="rgba(0,0,0,0.55)"/>
+      </filter>
+      <filter id="itemShadow" x="-20%" y="-20%" width="140%" height="140%">
+        <feDropShadow dx="2" dy="4" stdDeviation="5" flood-color="rgba(0,0,0,0.50)"/>
+      </filter>
+      <filter id="wBlur">
+        <feGaussianBlur stdDeviation="2.8"/>
+      </filter>
+      <filter id="titleGlow">
+        <feDropShadow dx="0" dy="0" stdDeviation="7" flood-color="rgba(210,168,20,0.55)"/>
+      </filter>
+
+      <!-- ── Title gold swash gradient ── -->
+      <linearGradient id="swashG" x1="0%" y1="0%" x2="100%" y2="0%">
+        <stop offset="0%"   stop-color="rgba(200,164,21,0)"/>
+        <stop offset="35%"  stop-color="rgba(200,164,21,0.65)"/>
+        <stop offset="65%"  stop-color="rgba(200,164,21,0.65)"/>
+        <stop offset="100%" stop-color="rgba(200,164,21,0)"/>
+      </linearGradient>
+    </defs>
+
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <!--                          THE MAP                                   -->
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <g filter="url(#mapShadow)">
+
+      <!-- Outer frame -->
+      <rect x="105" y="44" width="690" height="422" rx="16"
+            fill="url(#frameG)" stroke="#6E4E10" stroke-width="2.5"/>
+      <!-- Inner bevel -->
+      <rect x="113" y="52" width="674" height="406" rx="12"
+            fill="none" stroke="rgba(255,220,100,0.4)" stroke-width="1.2"/>
+      <!-- Sea -->
+      <rect x="118" y="57" width="664" height="397" rx="9"
+            fill="url(#seaFill)"/>
+
+      <!-- ── Sea wave dashes ── -->
+      <g stroke="rgba(255,255,255,0.16)" stroke-width="1.4" fill="none">
+        <path d="M130 100 C143 96,153 104,166 100 C179 96,189 104,202 100"/>
+        <path d="M130 116 C143 112,153 120,166 116 C179 112,189 120,202 116"/>
+        <path d="M130 390 C143 386,153 394,166 390 C179 386,189 394,202 390"/>
+        <path d="M510 390 C523 386,533 394,546 390 C559 386,569 394,582 390"/>
+        <path d="M510 406 C523 402,533 410,546 406 C559 402,569 410,582 406"/>
+        <path d="M650 108 C663 104,673 112,686 108 C699 104,709 112,722 108"/>
+        <path d="M650 124 C663 120,673 128,686 124 C699 120,709 128,722 124"/>
+      </g>
+
+      <!-- ── Main landmass ── -->
+      <path d="M252 184 C272 163,332 150,380 165 C428 180,460 200,478 224
+               C496 248,506 278,498 310 C490 342,468 362,436 370
+               C404 378,370 374,342 360 C314 346,285 324,265 296
+               C245 268,234 240,238 210 Z"
+            fill="url(#landG)" stroke="#9A7828" stroke-width="1.8"/>
+
+      <!-- Terrain ridges -->
+      <g fill="none" stroke="#8A6820" stroke-width="1.6" stroke-linejoin="round" opacity="0.65">
+        <path d="M288 248 L300 226 L312 248"/>
+        <path d="M334 258 L348 234 L362 258"/>
+        <path d="M380 274 L394 250 L408 274"/>
+        <path d="M425 280 L437 260 L449 280"/>
+      </g>
+
+      <!-- Vegetation dots -->
+      <g opacity="0.55">
+        <circle cx="308" cy="304" r="8" fill="#6E8030"/>
+        <circle cx="322" cy="298" r="6" fill="#7A9038"/>
+        <circle cx="465" cy="258" r="8" fill="#6E8030"/>
+        <circle cx="478" cy="264" r="5" fill="#7A9038"/>
+        <circle cx="268" cy="270" r="7" fill="#6E8030"/>
+        <circle cx="462" cy="318" r="7" fill="#6E8030"/>
+        <circle cx="296" cy="274" r="5" fill="#7A9038"/>
+      </g>
+
+      <!-- ── Island NE ── -->
+      <ellipse cx="590" cy="180" rx="46" ry="29" fill="url(#landG)" stroke="#9A7828" stroke-width="1.8"/>
+      <g fill="none" stroke="#8A6820" stroke-width="1.5" stroke-linejoin="round" opacity="0.6">
+        <path d="M576 170 L588 150 L600 170"/>
+      </g>
+
+      <!-- ── Island SE ── -->
+      <path d="M602 330 C622 316,650 314,664 332 C678 350,666 374,646 376
+               C626 378,604 360,602 330 Z"
+            fill="url(#landG)" stroke="#9A7828" stroke-width="1.8"/>
+
+      <!-- ── Island W ── -->
+      <ellipse cx="196" cy="332" rx="34" ry="22" fill="#D0B060" stroke="#9A7828" stroke-width="1.8"/>
+
+      <!-- ── Dotted trail ── -->
+      <path d="M 362 308 C 450 280, 524 238, 590 183"
+            fill="none" stroke="#7A5618" stroke-width="2.4"
+            stroke-dasharray="8,6" opacity="0.9"/>
+      <path d="M 590 183 C 612 216, 630 276, 638 332"
+            fill="none" stroke="#7A5618" stroke-width="2.4"
+            stroke-dasharray="8,6" opacity="0.9"/>
+
+      <!-- ── X marks ── -->
+      <g stroke="#B81818" stroke-width="3.5" stroke-linecap="round">
+        <g transform="translate(362,308)">
+          <line x1="-10" y1="-10" x2="10" y2="10"/>
+          <line x1="10" y1="-10" x2="-10" y2="10"/>
+        </g>
+        <circle cx="362" cy="308" r="15" fill="none" stroke="#B81818" stroke-width="1.4" opacity="0.6"/>
+        <g transform="translate(638,332)">
+          <line x1="-10" y1="-10" x2="10" y2="10"/>
+          <line x1="10" y1="-10" x2="-10" y2="10"/>
+        </g>
+        <circle cx="638" cy="332" r="15" fill="none" stroke="#B81818" stroke-width="1.4" opacity="0.6"/>
+      </g>
+
+      <!-- ── Corner ornaments ── -->
+      <g font-family="serif" font-size="20" fill="rgba(155,115,30,0.58)" text-anchor="middle">
+        <text x="135" y="82">✦</text>
+        <text x="765" y="82">✦</text>
+        <text x="135" y="456">✦</text>
+        <text x="765" y="456">✦</text>
+      </g>
+
+      <!-- ── Map header text ── -->
+      <text x="450" y="80" text-anchor="middle"
+            font-family="Georgia,'Times New Roman',serif" font-size="12"
+            fill="rgba(185,145,35,0.75)" letter-spacing="4.5">
+        CARTA MARIS · SEA MANGO TERRITORY
+      </text>
+      <line x1="155" y1="86" x2="340" y2="86"
+            stroke="rgba(185,145,35,0.4)" stroke-width="0.9"/>
+      <line x1="560" y1="86" x2="745" y2="86"
+            stroke="rgba(185,145,35,0.4)" stroke-width="0.9"/>
+
+      <!-- ── Compass Rose ── -->
+      <g transform="translate(740, 408)">
+        <circle r="44" fill="rgba(235,210,145,0.14)" stroke="rgba(195,155,45,0.5)" stroke-width="1.6"/>
+        <circle r="30" fill="none" stroke="rgba(195,155,45,0.28)" stroke-width="1"/>
+        <!-- N (red) -->
+        <polygon points="0,-44 -7,-25 7,-25" fill="#CC2020"/>
+        <!-- S (red, faded) -->
+        <polygon points="0,44 -7,25 7,25"   fill="#CC2020" opacity="0.48"/>
+        <!-- E / W (gold) -->
+        <polygon points="44,0 25,-7 25,7"  fill="#C8A414" opacity="0.82"/>
+        <polygon points="-44,0 -25,-7 -25,7" fill="#C8A414" opacity="0.82"/>
+        <!-- Intercardinal tick lines -->
+        <g stroke="rgba(188,148,38,0.5)" stroke-width="1">
+          <line x1="22" y1="-22" x2="13" y2="-13"/>
+          <line x1="22" y1="22"  x2="13" y2="13"/>
+          <line x1="-22" y1="-22" x2="-13" y2="-13"/>
+          <line x1="-22" y1="22"  x2="-13" y2="13"/>
+        </g>
+        <circle r="7" fill="#C8A414"/>
+        <circle r="3" fill="#7A5000"/>
+        <text x="0" y="-52" text-anchor="middle"
+              font-family="Georgia,serif" font-size="13" font-weight="bold"
+              fill="rgba(200,158,44,0.95)">N</text>
+      </g>
+    </g><!-- /map group -->
+
+
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <!--                      WHITE WISPS                                   -->
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+
+    <!-- Wisps — Ruby area (top-right) -->
+    <g filter="url(#wBlur)">
+      <path d="M 862 68 C 882 86,900 116,884 150 C 868 184,844 188,852 218"
+            fill="none" stroke="white" stroke-width="3.2" stroke-linecap="round" opacity="0.8"/>
+      <path d="M 876 62 C 896 84,910 118,892 154 C 874 190,854 196,864 228"
+            fill="none" stroke="white" stroke-width="1.6" stroke-linecap="round" opacity="0.48"/>
+      <path d="M 846 74 C 860 98,868 130,852 158"
+            fill="none" stroke="white" stroke-width="2.2" stroke-linecap="round" opacity="0.58"/>
+    </g>
+    <!-- Ruby sparkle crosses -->
+    <g fill="white">
+      <circle cx="878" cy="54" r="3.5" opacity="0.9"/>
+      <circle cx="896" cy="70" r="2"   opacity="0.7"/>
+      <circle cx="860" cy="50" r="2.2" opacity="0.65"/>
+      <circle cx="844" cy="64" r="1.6" opacity="0.5"/>
+    </g>
+    <g stroke="white" stroke-width="1.6" stroke-linecap="round" opacity="0.85">
+      <line x1="884" y1="52" x2="884" y2="60"/><line x1="880" y1="56" x2="888" y2="56"/>
+    </g>
+
+    <!-- Wisps — Emerald area (left) -->
+    <g filter="url(#wBlur)">
+      <path d="M 42 218 C 20 240,10 272,30 298 C 50 324,74 318,58 350"
+            fill="none" stroke="white" stroke-width="3.2" stroke-linecap="round" opacity="0.76"/>
+      <path d="M 56 212 C 32 238,22 274,42 300 C 62 326,86 320,70 354"
+            fill="none" stroke="white" stroke-width="1.5" stroke-linecap="round" opacity="0.45"/>
+      <path d="M 32 222 C 14 248,16 280,36 305"
+            fill="none" stroke="white" stroke-width="2" stroke-linecap="round" opacity="0.55"/>
+    </g>
+    <g fill="white">
+      <circle cx="40" cy="204" r="3.2" opacity="0.9"/>
+      <circle cx="24" cy="218" r="2"   opacity="0.7"/>
+      <circle cx="54" cy="200" r="1.8" opacity="0.6"/>
+    </g>
+    <g stroke="white" stroke-width="1.6" stroke-linecap="round" opacity="0.85">
+      <line x1="26" y1="206" x2="26" y2="214"/><line x1="22" y1="210" x2="30" y2="210"/>
+    </g>
+
+    <!-- Wisps — Sapphire area (top, above map) -->
+    <g filter="url(#wBlur)" opacity="0.7">
+      <path d="M 175 20 C 198 36,204 58,226 64"
+            fill="none" stroke="white" stroke-width="2.6" stroke-linecap="round"/>
+      <path d="M 188 14 C 212 32,218 56,240 62"
+            fill="none" stroke="white" stroke-width="1.3" stroke-linecap="round"/>
+    </g>
+
+    <!-- Wisps — Amethyst area (bottom-left) -->
+    <g filter="url(#wBlur)" opacity="0.76">
+      <path d="M 70 474 C 92 455,115 462,140 446 C 165 430,162 406,186 400"
+            fill="none" stroke="white" stroke-width="2.8" stroke-linecap="round"/>
+      <path d="M 76 490 C 100 469,124 477,150 460 C 176 443,174 418,198 412"
+            fill="none" stroke="white" stroke-width="1.4" stroke-linecap="round"/>
+    </g>
+
+    <!-- Wisps — Chest + Mango area (below map) -->
+    <g filter="url(#wBlur)">
+      <path d="M 288 482 C 320 460,370 466,408 455 C 446 444,478 438,510 452
+               C 542 466,568 488,600 476"
+            fill="none" stroke="white" stroke-width="3.6" stroke-linecap="round" opacity="0.82"/>
+      <path d="M 294 498 C 328 474,380 482,418 470 C 456 458,488 452,520 467
+               C 552 482,576 505,608 493"
+            fill="none" stroke="white" stroke-width="1.8" stroke-linecap="round" opacity="0.48"/>
+      <path d="M 618 480 C 648 465,672 472,694 460"
+            fill="none" stroke="white" stroke-width="2.4" stroke-linecap="round" opacity="0.62"/>
+    </g>
+
+    <!-- Wisps — Gold coins area (right) -->
+    <g filter="url(#wBlur)" opacity="0.72">
+      <path d="M 860 364 C 878 380,892 400,876 424 C 860 448,848 442,852 468"
+            fill="none" stroke="white" stroke-width="2.6" stroke-linecap="round"/>
+    </g>
+
+    <!-- Pearl area wisps (top-center) -->
+    <g filter="url(#wBlur)" opacity="0.65">
+      <path d="M 384 18 C 402 30,400 50,418 56"
+            fill="none" stroke="white" stroke-width="2.2" stroke-linecap="round"/>
+    </g>
+
+    <!-- Floating sparkles (scattered) -->
+    <g fill="white">
+      <!-- Around pearl -->
+      <circle cx="400" cy="20" r="3"   opacity="0.9"/>
+      <circle cx="418" cy="14" r="2"   opacity="0.7"/>
+      <circle cx="384" cy="16" r="1.8" opacity="0.6"/>
+      <!-- Around coins -->
+      <circle cx="866" cy="356" r="3"   opacity="0.82"/>
+      <circle cx="882" cy="344" r="2"   opacity="0.65"/>
+      <circle cx="854" cy="350" r="1.6" opacity="0.5"/>
+      <!-- Below map -->
+      <circle cx="452" cy="542" r="3.2" opacity="0.88"/>
+      <circle cx="472" cy="535" r="2.2" opacity="0.72"/>
+      <circle cx="436" cy="538" r="2"   opacity="0.62"/>
+      <circle cx="490" cy="548" r="1.8" opacity="0.55"/>
+    </g>
+    <!-- Extra sparkle crosses (below map wisps) -->
+    <g stroke="white" stroke-width="1.5" stroke-linecap="round" opacity="0.78">
+      <line x1="340" y1="510" x2="340" y2="518"/><line x1="336" y1="514" x2="344" y2="514"/>
+      <line x1="575" y1="502" x2="575" y2="510"/><line x1="571" y1="506" x2="579" y2="506"/>
+    </g>
+
+
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <!--                       TREASURES                                    -->
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+
+    <!-- ── RUBY (top-right) ── -->
+    <g transform="translate(862,84)" filter="url(#gemGlow)">
+      <polygon points="0,-30 24,0 0,26 -24,0" fill="url(#rubyG)" stroke="#FF9898" stroke-width="1.2"/>
+      <!-- Top facet -->
+      <polygon points="0,-30 24,0 0,-10"        fill="rgba(255,200,200,0.42)"/>
+      <!-- Bottom shadow -->
+      <polygon points="0,-10 24,0 0,26 -24,0"   fill="rgba(0,0,0,0.12)"/>
+      <!-- Highlight sparkle line -->
+      <line x1="-5" y1="-24" x2="-13" y2="-30" stroke="rgba(255,225,225,0.85)" stroke-width="1.8" stroke-linecap="round"/>
+    </g>
+
+    <!-- ── EMERALD (left) ── -->
+    <g transform="translate(44,240)" filter="url(#gemGlow)">
+      <polygon points="0,-28 22,0 0,24 -22,0" fill="url(#emG)" stroke="#A0FFB8" stroke-width="1.2"/>
+      <polygon points="0,-28 22,0 0,-9"        fill="rgba(180,255,200,0.42)"/>
+      <polygon points="0,-9 22,0 0,24 -22,0"   fill="rgba(0,0,0,0.1)"/>
+      <line x1="-4" y1="-22" x2="-11" y2="-28" stroke="rgba(210,255,220,0.82)" stroke-width="1.8" stroke-linecap="round"/>
+    </g>
+
+    <!-- ── SAPPHIRE (top, above map) ── -->
+    <g transform="translate(216,30)" filter="url(#gemGlow)">
+      <!-- Hexagonal cut -->
+      <polygon points="0,-26 20,-13 20,13 0,26 -20,13 -20,-13"
+               fill="url(#sapG)" stroke="#A8CEFF" stroke-width="1.2"/>
+      <polygon points="0,-26 20,-13 0,-8"  fill="rgba(185,220,255,0.42)"/>
+      <line x1="-4" y1="-22" x2="-12" y2="-26" stroke="rgba(210,228,255,0.82)" stroke-width="1.8" stroke-linecap="round"/>
+    </g>
+
+    <!-- ── AMETHYST (bottom-left) ── -->
+    <g transform="translate(70,502)" filter="url(#gemGlow)">
+      <polygon points="0,-28 20,0 0,24 -20,0" fill="url(#amG)" stroke="#DDA8FF" stroke-width="1.2"/>
+      <polygon points="0,-28 20,0 0,-9"        fill="rgba(225,185,255,0.42)"/>
+      <polygon points="0,-9 20,0 0,24 -20,0"   fill="rgba(0,0,0,0.1)"/>
+      <line x1="-4" y1="-22" x2="-11" y2="-28" stroke="rgba(230,205,255,0.82)" stroke-width="1.8" stroke-linecap="round"/>
+    </g>
+
+    <!-- ── PEARL (top-center) ── -->
+    <g transform="translate(382,26)" filter="url(#gemGlow)">
+      <circle r="17" fill="url(#pearlG)" stroke="rgba(255,255,255,0.92)" stroke-width="1.4"/>
+      <ellipse cx="-5" cy="-6" rx="6" ry="4.5" fill="rgba(255,255,255,0.65)" transform="rotate(-28,-5,-6)"/>
+      <circle cx="-6" cy="-7" r="3.5" fill="rgba(255,255,255,0.5)"/>
+    </g>
+
+    <!-- ── GOLD COIN STACKS (right) ── -->
+    <g transform="translate(847,398)" filter="url(#itemShadow)">
+      <!-- Stack 1 (back) -->
+      <ellipse cx="10" cy="8"    rx="18" ry="7"  fill="#9E6C08" stroke="#7A5006" stroke-width="1"/>
+      <rect x="-8"  y="-18" width="36" height="24" rx="2" fill="url(#goldG)" stroke="#C09010" stroke-width="1.4"/>
+      <ellipse cx="10" cy="-18"  rx="18" ry="7"  fill="#F2CC44" stroke="#C09010" stroke-width="1.4"/>
+      <ellipse cx="10" cy="-18"  rx="11" ry="4"  fill="none"    stroke="rgba(200,140,20,0.55)" stroke-width="1"/>
+      <!-- Stack 2 (front, offset) -->
+      <ellipse cx="32" cy="14"   rx="16" ry="6"  fill="#9E6C08" stroke="#7A5006" stroke-width="1"/>
+      <rect x="16"  y="-4"  width="32" height="18" rx="2" fill="url(#goldG)" stroke="#C09010" stroke-width="1.4"/>
+      <ellipse cx="32" cy="-4"   rx="16" ry="6"  fill="#F2CC44" stroke="#C09010" stroke-width="1.4"/>
+      <!-- Loose coin -->
+      <ellipse cx="-8" cy="20"   rx="13" ry="5"  fill="url(#goldG)" stroke="#C09010" stroke-width="1"/>
+    </g>
+
+    <!-- ── TREASURE CHEST (below map, center-left) ── -->
+    <g transform="translate(330,488)" filter="url(#itemShadow)">
+      <!-- Body -->
+      <rect x="-40" y="4" width="80" height="44" rx="4" fill="url(#woodG)" stroke="#3C2006" stroke-width="2.2"/>
+      <!-- Arched lid -->
+      <path d="M -40,4 Q -40,-20 0,-22 Q 40,-20 40,4 Z" fill="#8E6018" stroke="#3C2006" stroke-width="2.2"/>
+      <!-- Gold banding on lid edge -->
+      <path d="M -40,4 Q -40,-20 0,-22 Q 40,-20 40,4"
+            fill="none" stroke="#C8A214" stroke-width="3.8"/>
+      <!-- Body bands -->
+      <rect x="-40" y="12" width="80" height="7" rx="1.5" fill="#C8A214" stroke="#9A7C08" stroke-width="0.8" opacity="0.92"/>
+      <rect x="-40" y="32" width="80" height="6" rx="1.5" fill="#C8A214" stroke="#9A7C08" stroke-width="0.8" opacity="0.92"/>
+      <!-- Lock plate -->
+      <rect x="-8" y="15" width="16" height="13" rx="2.5" fill="#C8A214" stroke="#9A7C08" stroke-width="1.4"/>
+      <!-- Lock hasp -->
+      <path d="M -4.5,15 Q -4.5,9.5 0,8.5 Q 4.5,9.5 4.5,15"
+            fill="none" stroke="#7A5E04" stroke-width="2.2"/>
+      <!-- Corner studs -->
+      <circle cx="-30" cy="25" r="4.5" fill="#C8A214" stroke="#9A7C08" stroke-width="0.8"/>
+      <circle cx=" 30" cy="25" r="4.5" fill="#C8A214" stroke="#9A7C08" stroke-width="0.8"/>
+      <!-- Inner glow hint -->
+      <rect x="-39" y="4" width="78" height="43" rx="3.5" fill="rgba(255,208,40,0.07)"/>
+    </g>
+
+    <!-- ── MANGO 🥭 (below map, center-right — hero item!) ── -->
+    <g transform="translate(528,492)" filter="url(#itemShadow)">
+      <!-- Mango body -->
+      <path d="M 0,-46 C 26,-40 40,-14 38,10 C 36,34 22,50 0,52
+               C -22,50 -36,34 -38,10 C -40,-14 -26,-40 0,-46 Z"
+            fill="url(#mangoG)" stroke="#C05800" stroke-width="2"/>
+      <!-- Blush/red flush on right side -->
+      <path d="M 10,-42 C 24,-32 34,-10 32,10 C 30,24 22,36 12,42"
+            fill="rgba(210,52,0,0.16)" stroke="none"/>
+      <!-- Primary highlight -->
+      <path d="M -14,-38 C -6,-45 8,-40 12,-28"
+            fill="none" stroke="rgba(255,242,130,0.8)" stroke-width="4"
+            stroke-linecap="round"/>
+      <!-- Secondary soft highlight -->
+      <path d="M -10,-32 C -4,-37 4,-34 8,-26"
+            fill="none" stroke="rgba(255,255,200,0.4)" stroke-width="2"
+            stroke-linecap="round"/>
+      <!-- Stem -->
+      <path d="M 0,-46 C 3,-56 12,-62 9,-68"
+            fill="none" stroke="#5A8200" stroke-width="3.2" stroke-linecap="round"/>
+      <!-- Leaf -->
+      <path d="M 9,-68 C 20,-78 32,-68 26,-56 C 20,-44 8,-56 9,-68 Z"
+            fill="#68AA00" stroke="#488000" stroke-width="1.4"/>
+      <!-- Leaf midrib -->
+      <path d="M 9,-68 C 16,-62 20,-56 17,-51"
+            fill="none" stroke="rgba(70,115,0,0.5)" stroke-width="0.9"/>
+    </g>
+
+
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <!--                        TITLE                                       -->
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+
+    <g transform="translate(450,608)" filter="url(#titleGlow)">
+
+      <!-- Decorative swash line -->
+      <line x1="-275" y1="-14" x2="-28"  y2="-14" stroke="url(#swashG)" stroke-width="1"/>
+      <line x1="28"   y1="-14" x2="275"  y2="-14" stroke="url(#swashG)" stroke-width="1"/>
+      <text x="0" y="-10" text-anchor="middle" font-size="13"
+            fill="rgba(200,164,21,0.62)">⬥</text>
+
+      <!--
+        "P"       – Pinyon Script 64px   baseline y=4
+        "roject " – Times New Roman 36px baseline y=-2
+        "S"       – Pinyon Script 64px   baseline y=4
+        "ea "     – Times New Roman 36px baseline y=-2
+        "M"       – Pinyon Script 64px   baseline y=4
+        "ango"    – Times New Roman 36px baseline y=-2
+
+        Approximate total width ≈ 410px  → start at x ≈ -205
+      -->
+
+      <!-- "P" -->
+      <text x="-205" y="4"
+            font-family="'Pinyon Script','Great Vibes','Dancing Script',cursive"
+            font-size="64" fill="#2C1A0E">P</text>
+      <!-- "roject " -->
+      <text x="-166" y="-2"
+            font-family="'Times New Roman',Times,Georgia,serif"
+            font-size="36" fill="#2C1A0E">roject&thinsp;</text>
+      <!-- "S" -->
+      <text x="-46" y="4"
+            font-family="'Pinyon Script','Great Vibes','Dancing Script',cursive"
+            font-size="64" fill="#2C1A0E">S</text>
+      <!-- "ea " -->
+      <text x="-10" y="-2"
+            font-family="'Times New Roman',Times,Georgia,serif"
+            font-size="36" fill="#2C1A0E">ea&thinsp;</text>
+      <!-- "M" -->
+      <text x="60" y="4"
+            font-family="'Pinyon Script','Great Vibes','Dancing Script',cursive"
+            font-size="64" fill="#2C1A0E">M</text>
+      <!-- "ango" -->
+      <text x="110" y="-2"
+            font-family="'Times New Roman',Times,Georgia,serif"
+            font-size="36" fill="#2C1A0E">ango</text>
+
+    </g>
+
+  </svg>
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+
+  <div class="btns">
+    <button onclick="dlSVG()">⬇ Save as SVG</button>
+    <button onclick="dlPNG()">⬇ Save as PNG (transparent)</button>
+  </div>
+
+  <script>
+    function dlSVG() {
+      const svg = document.getElementById('design');
+      const xml = new XMLSerializer().serializeToString(svg);
+      const blob = new Blob([xml], { type: 'image/svg+xml' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'project-sea-mango.svg';
+      a.click();
+    }
+
+    function dlPNG() {
+      // Wait for fonts, then rasterise at 2×
+      document.fonts.ready.then(() => {
+        const svg = document.getElementById('design');
+        const xml = new XMLSerializer().serializeToString(svg);
+        const blob = new Blob([xml], { type: 'image/svg+xml;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const img = new Image();
+        img.onload = () => {
+          const W = 1800, H = 1320; // 2× for hi-res
+          const canvas = document.createElement('canvas');
+          canvas.width = W; canvas.height = H;
+          const ctx = canvas.getContext('2d');
+          ctx.scale(2, 2);
+          ctx.drawImage(img, 0, 0);
+          canvas.toBlob(pngBlob => {
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(pngBlob);
+            a.download = 'project-sea-mango.png';
+            a.click();
+            URL.revokeObjectURL(url);
+          }, 'image/png');
+        };
+        img.src = url;
+      });
+    }
+  </script>
+<!-- impeccable-live-start -->
+<script src="http://localhost:8400/live.js"></script>
+<!-- impeccable-live-end -->
+</body>
+</html>
