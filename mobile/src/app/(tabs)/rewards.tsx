@@ -2,7 +2,8 @@ import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Card, Pill, ProgressBar } from '@/components/ui';
-import { LEDGER, ME, nextTier, REWARDS, TIERS, tierForPoints } from '@/lib/mock-data';
+import { useLedger, useMe, useRewards } from '@/lib/data';
+import { nextTier, TIERS, tierForPoints } from '@/lib/mock-data';
 import { colors, tierColors } from '@/lib/theme';
 
 type SubTab = 'tiers' | 'redeem' | 'history';
@@ -15,16 +16,19 @@ const SUB_TABS: { key: SubTab; label: string }[] = [
 
 export default function RewardsScreen() {
   const [subTab, setSubTab] = useState<SubTab>('tiers');
-  const tier = tierForPoints(ME.points);
+  const { data: me } = useMe();
+  const { data: rewards } = useRewards();
+  const { data: ledger } = useLedger();
+  const tier = tierForPoints(me.points);
   const next = nextTier(tier);
-  const pct = next ? Math.round(((ME.points - tier.min) / (next.min - tier.min)) * 100) : 100;
+  const pct = next ? Math.round(((me.points - tier.min) / (next.min - tier.min)) * 100) : 100;
 
   return (
     <SafeAreaView style={styles.screen} edges={['top']}>
       <View style={styles.header}>
         <Text style={styles.balanceLabel}>Your Balance</Text>
         <View style={styles.balanceRow}>
-          <Text style={styles.balanceValue}>{ME.points.toLocaleString()}</Text>
+          <Text style={styles.balanceValue}>{me.points.toLocaleString()}</Text>
           <Text style={styles.balanceUnit}>points</Text>
         </View>
         <Pill label={`${tier.icon} ${tier.name} Tier`} />
@@ -33,7 +37,7 @@ export default function RewardsScreen() {
             <View style={styles.progressLabels}>
               <Text style={styles.progressHint}>{tier.name}</Text>
               <Text style={styles.progressStrong}>
-                {(next.min - ME.points).toLocaleString()} pts to {next.name}
+                {(next.min - me.points).toLocaleString()} pts to {next.name}
               </Text>
               <Text style={styles.progressHint}>{next.name}</Text>
             </View>
@@ -62,7 +66,7 @@ export default function RewardsScreen() {
       <ScrollView contentContainerStyle={styles.list} showsVerticalScrollIndicator={false}>
         {subTab === 'tiers' &&
           TIERS.map((t) => {
-            const unlocked = ME.points >= t.min;
+            const unlocked = me.points >= t.min;
             const isCurrent = t.name === tier.name;
             const tierColor = tierColors[t.name];
             return (
@@ -105,8 +109,8 @@ export default function RewardsScreen() {
           })}
 
         {subTab === 'redeem' &&
-          REWARDS.map((r) => {
-            const affordable = ME.points >= r.costPoints;
+          rewards.map((r) => {
+            const affordable = me.points >= r.costPoints;
             return (
               <Card key={r.id} style={styles.redeemRow}>
                 <View style={styles.redeemIcon}>
@@ -131,7 +135,7 @@ export default function RewardsScreen() {
           })}
 
         {subTab === 'history' &&
-          LEDGER.map((entry) => (
+          ledger.map((entry) => (
             <Card key={entry.id} style={styles.historyRow}>
               <Text style={{ fontSize: 22 }}>{entry.icon}</Text>
               <View style={{ flex: 1 }}>

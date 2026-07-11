@@ -3,16 +3,19 @@ import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ChallengeCard, UpcomingChallengeCard } from '@/components/challenge-card';
 import { Pill, ProgressBar, SectionHeader } from '@/components/ui';
-import { CHALLENGES, ME, nextTier, tierForPoints } from '@/lib/mock-data';
+import { useChallenges, useMe } from '@/lib/data';
+import { nextTier, tierForPoints } from '@/lib/mock-data';
 import { colors } from '@/lib/theme';
 
 export default function HomeScreen() {
   const router = useRouter();
-  const tier = tierForPoints(ME.points);
+  const { data: me } = useMe();
+  const { data: challenges } = useChallenges();
+  const tier = tierForPoints(me.points);
   const next = nextTier(tier);
-  const pct = next ? Math.round(((ME.points - tier.min) / (next.min - tier.min)) * 100) : 100;
-  const active = CHALLENGES.filter((c) => c.active);
-  const upcoming = CHALLENGES.filter((c) => !c.active);
+  const pct = next ? Math.round(((me.points - tier.min) / (next.min - tier.min)) * 100) : 100;
+  const active = challenges.filter((c) => c.active);
+  const upcoming = challenges.filter((c) => !c.active);
 
   return (
     <SafeAreaView style={styles.screen} edges={['top']}>
@@ -21,10 +24,10 @@ export default function HomeScreen() {
           <View style={styles.headerRow}>
             <View>
               <Text style={styles.greeting}>Good morning,</Text>
-              <Text style={styles.name}>{ME.displayName} 🐯</Text>
+              <Text style={styles.name}>{me.displayName} 🐯</Text>
             </View>
             <View style={styles.avatar}>
-              <Text style={{ fontSize: 22 }}>{ME.avatar}</Text>
+              <Text style={{ fontSize: 22 }}>{me.avatar}</Text>
             </View>
           </View>
 
@@ -35,15 +38,15 @@ export default function HomeScreen() {
               </Text>
               <View style={{ flexDirection: 'row', gap: 6 }}>
                 <Pill label={`${tier.icon} ${tier.name}`} />
-                <Pill label={`#${ME.weeklyRank} 🏆`} bg="#FFF0F0" color={colors.crimsonDark} />
+                <Pill label={me.weeklyRank ? `#${me.weeklyRank} 🏆` : '🏆'} bg="#FFF0F0" color={colors.crimsonDark} />
               </View>
             </View>
             <ProgressBar pct={pct} />
             <View style={styles.progressBottom}>
               <Text style={styles.progressHint}>{tier.name}</Text>
               <Text style={styles.progressPoints}>
-                {ME.points.toLocaleString()} pts
-                {next ? ` · ${(next.min - ME.points).toLocaleString()} to ${next.name}` : ''}
+                {me.points.toLocaleString()} pts
+                {next ? ` · ${(next.min - me.points).toLocaleString()} to ${next.name}` : ''}
               </Text>
               <Text style={styles.progressHint}>{next?.name ?? ''}</Text>
             </View>

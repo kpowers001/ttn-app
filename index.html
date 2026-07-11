@@ -7,6 +7,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
   <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
   <script src="https://unpkg.com/@babel/standalone@7.22.17/babel.min.js"></script>
@@ -66,6 +67,12 @@ const T2 = '#717171';                    // secondary text
 const T3 = '#ADADAD';                    // muted text
 const BD = '#EBEBEB';                    // border
 const SH = '0 1px 10px rgba(0,0,0,0.08)'; // card shadow
+
+// ─── Supabase ─────────────────────────────────────────────────────────────────
+// Anon key is public by design; row-level security governs all access.
+const SUPABASE_URL  = 'https://ftdtkbfocknvudmawafh.supabase.co';
+const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ0ZHRrYmZvY2tudnVkbWF3YWZoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM3MjE5ODEsImV4cCI6MjA5OTI5Nzk4MX0.nJv-t_rkoEFT6VY5Fm3fETZq7MCgrknIuomPp7K6Xec';
+const db = window.supabase ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON) : null;
 
 // ─── Data ─────────────────────────────────────────────────────────────────────
 const TRAILS = {
@@ -155,6 +162,125 @@ const BADGES_DATA = [
   {icon:'👥',name:'Social Tiger',    earned:false},
 ];
 
+// ─── Live data ────────────────────────────────────────────────────────────────
+// The constants above are dev fallbacks; when signed in, everything below is
+// replaced by real rows from Supabase.
+
+const ME_FALLBACK = { username:'tigerexplorer', displayName:'Tiger Explorer', classification:'Sophomore', avatar:'😊', points:1540, weeklyRank:3, email:'tiger@tuskegee.edu' };
+
+const REWARDS_FALLBACK = [
+  {id:'bookstore-20', name:'Bookstore Discount (20%)', cost:500,  icon:'📚', partner:'TU Bookstore'},
+  {id:'campus-meal',  name:'Free Campus Meal',         cost:300,  icon:'🍽️', partner:'Tiger Dining'},
+  {id:'bbq-plate',    name:'BBQ Plate',                cost:800,  icon:'🍖', partner:'B&B Barbecue'},
+  {id:'honey-jar',    name:'Local Honey Jar',          cost:700,  icon:'🍯', partner:'Tuskegee Honey'},
+];
+
+const HISTORY_FALLBACK = [
+  {id:'h1', act:'Visited The Golden Fork',    pts:50,   date:'Today',     icon:'🍽️'},
+  {id:'h2', act:'Completed Food Challenge',   pts:150,  date:'Yesterday', icon:'🔥'},
+  {id:'h3', act:'Visited Heritage Farm',      pts:60,   date:'May 19',    icon:'🌾'},
+  {id:'h4', act:'Redeemed Bookstore Discount',pts:-300, date:'May 18',    icon:'📚'},
+];
+
+const fmtDeadline = iso => new Date(iso).toLocaleDateString('en-US',{month:'short',day:'numeric'});
+const fmtExpires = iso => {
+  const days = Math.ceil((new Date(iso).getTime() - Date.now()) / 86400000);
+  if (days <= 0) return 'Today';
+  if (days === 1) return 'Tomorrow';
+  if (days < 7) return `${days} days`;
+  return 'Next week';
+};
+const fmtLedgerDate = iso => {
+  const days = Math.floor((Date.now() - new Date(iso).getTime()) / 86400000);
+  if (days === 0) return 'Today';
+  if (days === 1) return 'Yesterday';
+  return new Date(iso).toLocaleDateString('en-US',{month:'short',day:'numeric'});
+};
+const LEDGER_ICONS = { visit:'📍', challenge:'🔥', redemption:'🎁' };
+
+async function fetchLive() {
+  const uid = (await db.auth.getUser()).data.user?.id;
+  const email = (await db.auth.getUser()).data.user?.email ?? '';
+  if (!uid) throw new Error('no session');
+
+  const [profileQ, pointsQ, weeklyQ, allTimeQ, trailsQ, locsQ, visitsQ, chQ, acceptsQ, badgesQ, myBadgesQ, badgeCountsQ, rewardsQ, ledgerQ] = await Promise.all([
+    db.from('profiles').select('username,classification,avatar').eq('id', uid).single(),
+    db.from('user_points').select('balance').eq('user_id', uid).maybeSingle(),
+    db.from('weekly_leaderboard').select('*').order('rank').order('username').limit(25),
+    db.from('alltime_leaderboard').select('*').order('rank').order('username').limit(25),
+    db.from('trails').select('*').order('sort_order'),
+    db.from('locations').select('*').eq('active', true),
+    db.from('visits').select('location_id'),
+    db.from('challenges_with_state').select('*').order('starts_at'),
+    db.from('challenge_accepts').select('challenge_id'),
+    db.from('badges').select('*').order('id'),
+    db.from('user_badges').select('badge_id').eq('user_id', uid),
+    db.from('user_badges').select('user_id'),
+    db.from('rewards').select('*').eq('active', true).order('cost_points'),
+    db.from('points_ledger').select('*').order('created_at', {ascending:false}).limit(15),
+  ]);
+  const bad = [profileQ, trailsQ, locsQ, visitsQ, chQ, badgesQ, rewardsQ].find(q => q.error);
+  if (bad) throw bad.error;
+
+  const visited = new Set(visitsQ.data.map(v => v.location_id));
+  const trails = {};
+  for (const t of trailsQ.data) {
+    trails[t.id] = { name:t.name, icon:t.icon, color:t.color, locations:[] };
+  }
+  for (const l of locsQ.data) {
+    trails[l.trail_id]?.locations.push({
+      id:l.id, name:l.name, desc:l.description, lat:l.lat, lng:l.lng,
+      pts:l.points, radiusM:l.radius_m, visited:visited.has(l.id),
+    });
+  }
+
+  const acceptedIds = new Set((acceptsQ.data ?? []).map(a => a.challenge_id));
+  const challenges = chQ.data.map(c => ({
+    id:c.id, title:c.title, biz:c.business_name, type:c.trail_id,
+    locationId:c.location_id, pts:c.bonus_points, icon:c.icon, badge:c.badge_icon,
+    active:c.active, expires:fmtExpires(c.active ? c.ends_at : c.starts_at),
+    deadline:fmtDeadline(c.ends_at), participants:null,
+    desc:`Visit ${c.business_name} while this challenge is live to earn the bonus.`,
+  }));
+
+  const badgeCounts = new Map();
+  for (const r of badgeCountsQ.data ?? []) {
+    badgeCounts.set(r.user_id, (badgeCounts.get(r.user_id) ?? 0) + 1);
+  }
+  const lbRow = r => ({
+    rank:Number(r.rank), name:r.username, pts:r.points,
+    badges:badgeCounts.get(r.user_id) ?? 0, av:r.avatar,
+    me:r.user_id === uid, yr:r.classification,
+  });
+
+  const earned = new Set((myBadgesQ.data ?? []).map(b => b.badge_id));
+
+  return {
+    me: {
+      username: profileQ.data.username,
+      displayName: profileQ.data.username,
+      classification: profileQ.data.classification,
+      avatar: profileQ.data.avatar,
+      points: pointsQ.data?.balance ?? 0,
+      weeklyRank: Number((weeklyQ.data ?? []).find(r => r.user_id === uid)?.rank ?? 0),
+      email,
+    },
+    trails,
+    challenges,
+    acceptedIds,
+    badges: badgesQ.data.map(b => ({icon:b.icon, name:b.name, earned:earned.has(b.id)})),
+    rewards: rewardsQ.data.map(r => ({id:r.id, name:r.name, cost:r.cost_points, icon:r.icon, partner:r.partner})),
+    history: (ledgerQ.data ?? []).map(l => ({id:String(l.id), act:l.reason, pts:l.delta, date:fmtLedgerDate(l.created_at), icon:LEDGER_ICONS[l.ref_type] ?? '⭐'})),
+    lb: {
+      weekly: (weeklyQ.data ?? []).map(lbRow),
+      allTime: (allTimeQ.data ?? []).map(lbRow),
+    },
+  };
+}
+
+const DataCtx = React.createContext(null);
+const useData = () => React.useContext(DataCtx);
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const StatusBar = () => (
   <div style={{height:44,display:'flex',alignItems:'center',justifyContent:'space-between',padding:'8px 24px 0',fontSize:13,fontWeight:600,color:T1}}>
@@ -240,7 +366,28 @@ function Field({label,placeholder,type='text',val,onChange}) {
 function Login({role,onLogin}) {
   const [step,setStep]=useState('login');
   const [form,setForm]=useState({email:'',pw:'',phone:'',year:'',username:''});
+  const [error,setError]=useState(null);
+  const [busy,setBusy]=useState(false);
   const isStu=role==='student';
+
+  const submit=async()=>{
+    setError(null);
+    if(!db){ onLogin(); return; }               // no backend configured — demo mode
+    if(step==='register'){
+      if(isStu&&!form.email.toLowerCase().endsWith('@tuskegee.edu')) return setError('Use your @tuskegee.edu email address');
+      if(isStu&&!form.username) return setError('Pick a username');
+      if(isStu&&!form.year) return setError('Select your classification');
+      if(form.pw.length<8) return setError('Password must be at least 8 characters');
+    }
+    if(!form.email||!form.pw) return setError('Enter your email and password');
+    setBusy(true);
+    const {error:err}=step==='login'
+      ? await db.auth.signInWithPassword({email:form.email.trim(),password:form.pw})
+      : await db.auth.signUp({email:form.email.trim(),password:form.pw,options:{data:{username:form.username.trim(),classification:form.year}}});
+    setBusy(false);
+    if(err) setError(err.message);
+    else onLogin();
+  };
 
   return (
     <div style={{width:'100%',height:'100%',background:S1,overflowY:'auto'}} className="scroll">
@@ -266,8 +413,9 @@ function Login({role,onLogin}) {
           <Field label={isStu?'School Email':'Business Email'} placeholder={isStu?'your.name@tuskegee.edu':'owner@business.com'} type="email" val={form.email} onChange={v=>setForm({...form,email:v})}/>
           <Field label="Password" placeholder="••••••••" type="password" val={form.pw} onChange={v=>setForm({...form,pw:v})}/>
         </div>
-        <button onClick={onLogin} style={{marginTop:22,width:'100%',padding:'16px',background:C,border:'none',borderRadius:30,color:'#FFF',fontSize:16,fontWeight:800,cursor:'pointer',boxShadow:`0 6px 24px rgba(212,32,32,0.32)`,letterSpacing:0.2}}>
-          {step==='login'?'Sign in →':'Create account →'}
+        {error&&<div style={{marginTop:14,background:'#FFF0F0',border:`1px solid ${C}30`,color:DC,borderRadius:12,padding:'10px 14px',fontSize:13,fontWeight:600}}>{error}</div>}
+        <button onClick={submit} disabled={busy} style={{marginTop:22,width:'100%',padding:'16px',background:busy?'#E0A0A0':C,border:'none',borderRadius:30,color:'#FFF',fontSize:16,fontWeight:800,cursor:busy?'default':'pointer',boxShadow:`0 6px 24px rgba(212,32,32,0.32)`,letterSpacing:0.2}}>
+          {busy?'One moment…':step==='login'?'Sign in →':'Create account →'}
         </button>
         <div onClick={()=>setStep(step==='login'?'register':'login')}
           style={{textAlign:'center',marginTop:16,fontSize:14,color:C,cursor:'pointer',fontWeight:600}}>
@@ -306,9 +454,14 @@ function TabBar({active,onChange}) {
 }
 
 // ─── Home ─────────────────────────────────────────────────────────────────────
+const tierFor = pts => TIERS.find(t=>pts>=t.min&&pts<=t.max) ?? TIERS[0];
+
 function HomeTab() {
-  const pts=1540, nextPts=2500;
-  const pct=Math.round((pts/nextPts)*100);
+  const {me,challenges}=useData();
+  const pts=me.points;
+  const cur=tierFor(pts);
+  const nxt=TIERS[TIERS.indexOf(cur)+1];
+  const pct=nxt?Math.round(((pts-cur.min)/(nxt.min-cur.min))*100):100;
   return (
     <div style={{height:'100%',overflowY:'auto',background:BG}} className="scroll">
       {/* White top bar */}
@@ -317,30 +470,29 @@ function HomeTab() {
         <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginTop:6}}>
           <div>
             <div style={{fontSize:13,color:T2}}>Good morning,</div>
-            <div style={{fontSize:23,fontWeight:900,color:T1,letterSpacing:-0.4}}>Tiger Explorer 🐯</div>
+            <div style={{fontSize:23,fontWeight:900,color:T1,letterSpacing:-0.4}}>{me.displayName} 🐯</div>
           </div>
           <div style={{position:'relative'}}>
-            <div style={{width:44,height:44,borderRadius:'50%',background:BG,border:`1.5px solid ${BD}`,display:'flex',alignItems:'center',justifyContent:'center',fontSize:22}}>😊</div>
-            <div style={{position:'absolute',top:-2,right:-2,width:14,height:14,borderRadius:'50%',background:'#FF3B30',border:`2px solid ${S1}`,display:'flex',alignItems:'center',justifyContent:'center',fontSize:7,color:'#FFF',fontWeight:900}}>3</div>
+            <div style={{width:44,height:44,borderRadius:'50%',background:BG,border:`1.5px solid ${BD}`,display:'flex',alignItems:'center',justifyContent:'center',fontSize:22}}>{me.avatar}</div>
           </div>
         </div>
 
         {/* Progress card */}
         <div style={{marginTop:16,background:BG,borderRadius:16,padding:'14px 16px',border:`1px solid ${BD}`}}>
           <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10}}>
-            <span style={{fontSize:12,color:T2,fontWeight:600}}>Progress to Gold</span>
+            <span style={{fontSize:12,color:T2,fontWeight:600}}>{nxt?`Progress to ${nxt.tier}`:'Top tier reached'}</span>
             <div style={{display:'flex',gap:6}}>
-              <Pill bg={GL} col='#9A7810'>🥈 Silver</Pill>
-              <Pill bg='#FFF0F0' col={DC}>#3 🏆</Pill>
+              <Pill bg={GL} col='#9A7810'>{cur.icon} {cur.tier}</Pill>
+              {me.weeklyRank>0&&<Pill bg='#FFF0F0' col={DC}>#{me.weeklyRank} 🏆</Pill>}
             </div>
           </div>
           <div style={{height:6,background:BD,borderRadius:3,overflow:'hidden',marginBottom:6}}>
             <div style={{height:'100%',width:`${pct}%`,background:`linear-gradient(90deg,${C},${G})`,borderRadius:3}}/>
           </div>
           <div style={{display:'flex',justifyContent:'space-between',fontSize:11,color:T3}}>
-            <span>Silver</span>
-            <span style={{color:T2,fontWeight:600}}>1,540 pts · 960 to Gold</span>
-            <span>Gold</span>
+            <span>{cur.tier}</span>
+            <span style={{color:T2,fontWeight:600}}>{pts.toLocaleString()} pts{nxt?` · ${(nxt.min-pts).toLocaleString()} to ${nxt.tier}`:''}</span>
+            <span>{nxt?.tier??''}</span>
           </div>
         </div>
       </div>
@@ -379,7 +531,7 @@ function HomeTab() {
       <div style={{padding:'22px 20px 0'}}>
         <SH2 title="🔥 Active Challenges" action="View all"/>
         <div style={{display:'flex',flexDirection:'column',gap:10}}>
-          {CHALLENGES.filter(c=>c.active).map(ch=><LocationChallengeCard key={ch.id} ch={ch}/>)}
+          {challenges.filter(c=>c.active).map(ch=><LocationChallengeCard key={ch.id} ch={ch}/>)}
         </div>
       </div>
 
@@ -387,7 +539,7 @@ function HomeTab() {
       <div style={{padding:'22px 20px 100px'}}>
         <SH2 title="Coming Up"/>
         <div style={{display:'flex',gap:10,overflowX:'auto',paddingBottom:4}} className="scroll">
-          {CHALLENGES.filter(c=>!c.active).map(ch=>(
+          {challenges.filter(c=>!c.active).map(ch=>(
             <div key={ch.id} style={{flexShrink:0,width:148,background:S1,borderRadius:16,padding:14,boxShadow:SH,cursor:'pointer'}}>
               <div style={{fontSize:30,marginBottom:8}}>{ch.icon}</div>
               <div style={{fontSize:13,fontWeight:700,color:T1,lineHeight:1.3}}>{ch.title}</div>
@@ -418,8 +570,9 @@ const PHOTO_CFG = {
 };
 
 function LocationChallengeCard({ch}) {
+  const {trails} = useData();
   const pc = PHOTO_CFG[ch.type] || {bg1:DC,bg2:C,pat1:C,pat2:'#FF6060'};
-  const trail = TRAILS[ch.type];
+  const trail = trails[ch.type];
   return (
     <div style={{background:S1,borderRadius:20,overflow:'hidden',boxShadow:SH,cursor:'pointer'}}>
       {/* ── Photo banner ── */}
@@ -439,11 +592,13 @@ function LocationChallengeCard({ch}) {
           <span style={{fontSize:11,lineHeight:1}}>📍</span>
           <span style={{fontSize:13,color:'#FFF',fontWeight:600,textShadow:'0 1px 4px rgba(0,0,0,0.4)'}}>{ch.biz}</span>
         </div>
-        {/* Participant count */}
-        <div style={{position:'absolute',bottom:10,right:12,display:'flex',alignItems:'center',gap:5}}>
-          <span style={{fontSize:14,lineHeight:1}}>👥</span>
-          <span style={{fontSize:13,color:'#FFF',fontWeight:600,textShadow:'0 1px 4px rgba(0,0,0,0.4)'}}>{ch.participants}</span>
-        </div>
+        {/* Participant count (hidden when the backend doesn't expose it) */}
+        {ch.participants!=null&&(
+          <div style={{position:'absolute',bottom:10,right:12,display:'flex',alignItems:'center',gap:5}}>
+            <span style={{fontSize:14,lineHeight:1}}>👥</span>
+            <span style={{fontSize:13,color:'#FFF',fontWeight:600,textShadow:'0 1px 4px rgba(0,0,0,0.4)'}}>{ch.participants}</span>
+          </div>
+        )}
       </div>
 
       {/* ── Content ── */}
@@ -462,12 +617,28 @@ function LocationChallengeCard({ch}) {
 
 // ─── Map ──────────────────────────────────────────────────────────────────────
 function MapTab() {
+  const {trails,refresh}=useData();
+  const allLocs = Object.entries(trails).flatMap(([k,t])=>t.locations.map(l=>({...l,trailKey:k,trail:t})));
   const [trail, setTrail] = useState('all');
   const [sel, setSel] = useState(null);
   const [mapReady, setMapReady] = useState(false);
+  const [checking, setChecking] = useState(false);
   const mapDivRef = useRef(null);
   const leafletRef = useRef(null);
   const markersRef = useRef([]);
+
+  const checkIn = async loc => {
+    if (!db || checking) return;
+    setChecking(true);
+    // Prototype demo: use the location's own coordinates as the user position.
+    // The mobile app sends real GPS; the geofence check is identical.
+    const { data, error } = await db.rpc('check_in', { p_location_id: loc.id, p_lat: loc.lat, p_lng: loc.lng });
+    setChecking(false);
+    if (error) { alert(error.message); return; }
+    setSel(null);
+    refresh();
+    alert(`✅ Checked in at ${loc.name}! +${data.points_awarded} pts`);
+  };
 
   // Init Leaflet once on mount
   useEffect(() => {
@@ -480,7 +651,7 @@ function MapTab() {
       maxZoom: 19,
     }).addTo(map);
     // Fit all 8 confirmed locations
-    const bounds = window.L.latLngBounds(ALL_LOCS.map(l => [l.lat, l.lng]));
+    const bounds = window.L.latLngBounds(allLocs.map(l => [l.lat, l.lng]));
     map.fitBounds(bounds, { padding: [52, 52] });
     leafletRef.current = map;
     setMapReady(true);
@@ -493,7 +664,7 @@ function MapTab() {
     if (!map) return;
     markersRef.current.forEach(m => map.removeLayer(m));
     markersRef.current = [];
-    const locs = trail === 'all' ? ALL_LOCS : ALL_LOCS.filter(l => l.trailKey === trail);
+    const locs = trail === 'all' ? allLocs : allLocs.filter(l => l.trailKey === trail);
     locs.forEach(loc => {
       const col = loc.visited ? loc.trail.color : '#888888';
       const markerHtml = `<div style="width:36px;height:36px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);background:${col};display:flex;align-items:center;justify-content:center;box-shadow:0 3px 14px rgba(0,0,0,0.30);border:2.5px solid white"><span style="transform:rotate(45deg);font-size:15px;line-height:1">${loc.visited ? loc.trail.icon : '🔒'}</span></div>`;
@@ -503,25 +674,25 @@ function MapTab() {
         .on('click', () => setSel(prev => prev?.id === loc.id ? null : loc));
       markersRef.current.push(m);
     });
-  }, [trail, mapReady]);
+  }, [trail, mapReady, trails]);
 
-  const vis = ALL_LOCS.filter(l => l.visited).length;
+  const vis = allLocs.filter(l => l.visited).length;
 
   return (
     <div style={{height:'100%',display:'flex',flexDirection:'column'}}>
       <div style={{background:S1,borderBottom:`1px solid ${BD}`,padding:'0 20px 14px'}}>
         <StatusBar/>
         <div style={{fontSize:22,fontWeight:900,color:T1,letterSpacing:-0.3}}>Explore 🗺️</div>
-        <div style={{fontSize:13,color:T2,marginTop:2}}>{vis}/{ALL_LOCS.length} locations discovered</div>
+        <div style={{fontSize:13,color:T2,marginTop:2}}>{vis}/{allLocs.length} locations discovered</div>
         <div style={{marginTop:10,height:5,background:BG,borderRadius:3,overflow:'hidden'}}>
-          <div style={{height:'100%',width:`${(vis/ALL_LOCS.length)*100}%`,background:`linear-gradient(90deg,${C},${G})`,borderRadius:3}}/>
+          <div style={{height:'100%',width:`${(vis/allLocs.length)*100}%`,background:`linear-gradient(90deg,${C},${G})`,borderRadius:3}}/>
         </div>
       </div>
 
       <div style={{display:'flex',gap:8,padding:'10px 14px',overflowX:'auto',background:S1,borderBottom:`1px solid ${BD}`}} className="scroll">
-        {[['all','🗺️','All'],...Object.entries(TRAILS).map(([k,t])=>[k,t.icon,t.name.replace(' Trail','')])].map(([k,ic,nm])=>{
+        {[['all','🗺️','All'],...Object.entries(trails).map(([k,t])=>[k,t.icon,t.name.replace(' Trail','')])].map(([k,ic,nm])=>{
           const on=trail===k;
-          const col=k==='all'?C:TRAILS[k]?.color||C;
+          const col=k==='all'?C:trails[k]?.color||C;
           return (
             <button key={k} onClick={()=>{setTrail(k);setSel(null);}} style={{flexShrink:0,padding:'7px 14px',borderRadius:20,border:`1px solid ${on?col:BD}`,background:on?`${col}15`:S1,color:on?col:T2,fontSize:12,fontWeight:700,cursor:'pointer',transition:'all 0.2s'}}>
               {ic} {nm}
@@ -547,6 +718,11 @@ function MapTab() {
                     : <Pill bg='#FFF3E0' col='#BF360C'>🔒 Visit to unlock · +{sel.pts} pts</Pill>
                   }
                 </div>
+                {!sel.visited&&db&&(
+                  <button onClick={()=>checkIn(sel)} disabled={checking} style={{marginTop:12,width:'100%',background:checking?'#E0A0A0':C,color:'#FFF',border:'none',borderRadius:24,padding:'12px',fontSize:13,fontWeight:800,cursor:checking?'default':'pointer',boxShadow:'0 4px 14px rgba(212,32,32,0.25)'}}>
+                    {checking?'Checking in…':'📍 Check In Here'}
+                  </button>
+                )}
               </div>
               <button onClick={()=>setSel(null)} style={{background:BG,border:'none',width:28,height:28,borderRadius:'50%',cursor:'pointer',fontSize:13,color:T2,flexShrink:0,marginLeft:8}}>✕</button>
             </div>
@@ -559,8 +735,21 @@ function MapTab() {
 
 // ─── Challenges ───────────────────────────────────────────────────────────────
 function ChallengesTab() {
+  const {challenges,trails,acceptedIds,refresh}=useData();
   const [filter,setFilter]=useState('all');
-  const shown=filter==='all'?CHALLENGES:CHALLENGES.filter(c=>c.type===filter);
+  const [busyId,setBusyId]=useState(null);
+  const shown=filter==='all'?challenges:challenges.filter(c=>c.type===filter);
+  const maxBonus=Math.max(0,...challenges.filter(c=>c.active).map(c=>c.pts));
+
+  const accept=async ch=>{
+    if(!db||busyId) return;
+    setBusyId(ch.id);
+    const uid=(await db.auth.getUser()).data.user?.id;
+    const {error}=await db.from('challenge_accepts').insert({user_id:uid,challenge_id:ch.id});
+    setBusyId(null);
+    if(error&&error.code!=='23505'){ alert(error.message); return; }   // 23505 = already accepted
+    refresh();
+  };
   return (
     <div style={{height:'100%',overflowY:'auto',background:BG}} className="scroll">
       <div style={{background:S1,borderBottom:`1px solid ${BD}`,padding:'0 20px 14px'}}>
@@ -580,14 +769,15 @@ function ChallengesTab() {
       <div style={{margin:'14px 20px 0',background:S1,borderRadius:18,padding:'14px 16px',boxShadow:SH,display:'flex',gap:12,alignItems:'center',border:`1px solid ${C}18`}}>
         <div style={{width:40,height:40,borderRadius:12,background:`${C}15`,display:'flex',alignItems:'center',justifyContent:'center',fontSize:22}}>⚡</div>
         <div>
-          <div style={{fontSize:15,fontWeight:800,color:T1}}>{CHALLENGES.filter(c=>c.active).length} Active Challenges</div>
-          <div style={{fontSize:12,color:T2}}>Earn up to 300 bonus pts this week</div>
+          <div style={{fontSize:15,fontWeight:800,color:T1}}>{challenges.filter(c=>c.active).length} Active Challenges</div>
+          <div style={{fontSize:12,color:T2}}>Earn up to {maxBonus} bonus pts this week</div>
         </div>
       </div>
 
       <div style={{padding:'12px 20px 100px',display:'flex',flexDirection:'column',gap:12}}>
         {shown.map(ch=>{
-          const tc=TRAILS[ch.type]?.color||C;
+          const tc=trails[ch.type]?.color||C;
+          const accepted=acceptedIds.has(ch.id);
           return (
             <div key={ch.id} style={{background:S1,borderRadius:20,padding:16,boxShadow:SH,opacity:ch.active?1:0.8,cursor:'pointer'}}>
               <div style={{display:'flex',gap:14,alignItems:'flex-start'}}>
@@ -606,9 +796,11 @@ function ChallengesTab() {
                 </div>
               </div>
               {ch.active&&(
-                <button style={{width:'100%',marginTop:14,background:C,color:'#FFF',border:'none',borderRadius:30,padding:'13px',fontSize:14,fontWeight:800,cursor:'pointer',boxShadow:`0 4px 16px rgba(212,32,32,0.28)`,letterSpacing:0.2}}>
-                  Accept Challenge →
-                </button>
+                accepted
+                  ? <div style={{width:'100%',marginTop:14,background:'#E8F5E9',color:'#2E7D32',borderRadius:30,padding:'13px',fontSize:14,fontWeight:800,textAlign:'center',letterSpacing:0.2}}>✓ Accepted — check in to complete</div>
+                  : <button onClick={()=>accept(ch)} disabled={busyId===ch.id} style={{width:'100%',marginTop:14,background:busyId===ch.id?'#E0A0A0':C,color:'#FFF',border:'none',borderRadius:30,padding:'13px',fontSize:14,fontWeight:800,cursor:'pointer',boxShadow:`0 4px 16px rgba(212,32,32,0.28)`,letterSpacing:0.2}}>
+                      {busyId===ch.id?'Accepting…':'Accept Challenge →'}
+                    </button>
               )}
             </div>
           );
@@ -620,9 +812,10 @@ function ChallengesTab() {
 
 // ─── Leaderboard ──────────────────────────────────────────────────────────────
 function LeaderboardTab() {
+  const {lb}=useData();
   const [period,setPeriod]=useState('weekly');
   const [friends,setFriends]=useState(false);
-  const data=LB[period];
+  const data=lb[period]??[];
   const shown=friends?data.filter(u=>u.me||[1,4].includes(u.rank)):data;
   const medals={1:G,2:'#AAAAAA',3:'#C27A3A'};
 
@@ -633,7 +826,7 @@ function LeaderboardTab() {
         <div style={{fontSize:22,fontWeight:900,color:T1,letterSpacing:-0.3}}>Leaderboard 🏆</div>
         <div style={{fontSize:13,color:T2,marginTop:2}}>Compete with your peers</div>
         <div style={{display:'flex',gap:4,marginTop:14,background:BG,borderRadius:12,padding:4}}>
-          {[['weekly','Weekly'],['monthly','Monthly'],['allTime','All Time']].map(([k,l])=>(
+          {[['weekly','Weekly'],['allTime','All Time']].map(([k,l])=>(
             <button key={k} onClick={()=>setPeriod(k)} style={{flex:1,padding:'9px 4px',border:'none',borderRadius:8,background:period===k?S1:'transparent',color:period===k?C:T2,fontSize:12,fontWeight:700,cursor:'pointer',transition:'all 0.2s',boxShadow:period===k?SH:undefined}}>
               {l}
             </button>
@@ -657,7 +850,7 @@ function LeaderboardTab() {
 
       <div style={{padding:'6px 20px 100px',display:'flex',flexDirection:'column',gap:8}}>
         {shown.map(u=>(
-          <div key={`${period}-${u.rank}`} style={{background:u.me?`${GL}`:S1,borderRadius:16,padding:'12px 14px',display:'flex',alignItems:'center',gap:12,boxShadow:SH,border:u.me?`1px solid ${G}30`:undefined}}>
+          <div key={`${period}-${u.name}`} style={{background:u.me?`${GL}`:S1,borderRadius:16,padding:'12px 14px',display:'flex',alignItems:'center',gap:12,boxShadow:SH,border:u.me?`1px solid ${G}30`:undefined}}>
             <div style={{width:32,height:32,borderRadius:'50%',background:medals[u.rank]||(u.me?`${GL}`:`${BG}`),display:'flex',alignItems:'center',justifyContent:'center',fontSize:13,fontWeight:900,color:u.rank<=3?'#FFF':T2,flexShrink:0}}>{u.rank}</div>
             <div style={{width:38,height:38,borderRadius:'50%',background:BG,display:'flex',alignItems:'center',justifyContent:'center',fontSize:20,flexShrink:0}}>{u.av}</div>
             <div style={{flex:1}}>
@@ -692,11 +885,24 @@ function PodiumItem({user,rank,height,crown}) {
 
 // ─── Rewards ──────────────────────────────────────────────────────────────────
 function RewardsTab() {
+  const {me,rewards,history,refresh}=useData();
   const [tab,setTab]=useState('tiers');
-  const pts=1540;
-  const cur=TIERS.find(t=>pts>=t.min&&pts<=t.max);
+  const [busyId,setBusyId]=useState(null);
+  const pts=me.points;
+  const cur=tierFor(pts);
   const nxt=TIERS[TIERS.indexOf(cur)+1];
   const pct=nxt?Math.round(((pts-cur.min)/(nxt.min-cur.min))*100):100;
+
+  const redeem=async item=>{
+    if(!db||busyId) return;
+    if(!confirm(`Redeem ${item.name} for ${item.cost} points?`)) return;
+    setBusyId(item.id);
+    const {data,error}=await db.rpc('redeem_reward',{p_reward_id:item.id});
+    setBusyId(null);
+    if(error){ alert(error.message); return; }
+    refresh();
+    alert(`🎫 Redeemed! Show this code at ${item.partner}: ${data.code}`);
+  };
 
   return (
     <div style={{height:'100%',overflowY:'auto',background:BG}} className="scroll">
@@ -705,10 +911,10 @@ function RewardsTab() {
         <StatusBar/>
         <div style={{fontSize:11,color:T3,fontWeight:700,textTransform:'uppercase',letterSpacing:1,marginBottom:6}}>Your Balance</div>
         <div style={{display:'flex',alignItems:'baseline',gap:8,marginBottom:8}}>
-          <div style={{fontSize:54,fontWeight:900,color:T1,fontFamily:'Georgia,serif',letterSpacing:-2,lineHeight:1}}>1,540</div>
+          <div style={{fontSize:54,fontWeight:900,color:T1,fontFamily:'Georgia,serif',letterSpacing:-2,lineHeight:1}}>{pts.toLocaleString()}</div>
           <div style={{fontSize:15,color:T3,fontWeight:500,paddingBottom:4}}>points</div>
         </div>
-        <Pill bg={GL} col='#9A7810'>🥈 Silver Tier</Pill>
+        <Pill bg={GL} col='#9A7810'>{cur.icon} {cur.tier} Tier</Pill>
         {nxt&&<div style={{marginTop:14}}>
           <div style={{display:'flex',justifyContent:'space-between',fontSize:11,color:T3,marginBottom:6}}>
             <span>{cur?.tier}</span><span style={{color:T2,fontWeight:600}}>{(nxt.min-pts).toLocaleString()} pts to {nxt.tier}</span><span>{nxt.tier}</span>
@@ -754,39 +960,36 @@ function RewardsTab() {
       {tab==='redeem'&&(
         /* Airbnb listing-style rows */
         <div style={{padding:'14px 20px 100px',display:'flex',flexDirection:'column',gap:10}}>
-          {[
-            {name:'Bookstore Discount (20%)',cost:500,icon:'📚',partner:'TU Bookstore'},
-            {name:'Free Campus Meal',cost:300,icon:'🍽️',partner:'Tiger Dining'},
-            {name:'Restaurant Gift Card ($5)',cost:800,icon:'🎫',partner:"Mama's Kitchen"},
-            {name:'Campus Store Voucher ($10)',cost:1000,icon:'🛍️',partner:'TU Campus Store'},
-          ].map((item,i)=>(
-            <div key={i} style={{background:S1,borderRadius:16,padding:14,display:'flex',gap:14,alignItems:'center',boxShadow:SH}}>
-              <div style={{width:52,height:52,borderRadius:14,background:GL,display:'flex',alignItems:'center',justifyContent:'center',fontSize:26}}>{item.icon}</div>
-              <div style={{flex:1}}>
-                <div style={{fontSize:14,fontWeight:700,color:T1}}>{item.name}</div>
-                <div style={{fontSize:12,color:T2}}>{item.partner}</div>
+          {rewards.map(item=>{
+            const ok=pts>=item.cost;
+            return (
+              <div key={item.id} style={{background:S1,borderRadius:16,padding:14,display:'flex',gap:14,alignItems:'center',boxShadow:SH}}>
+                <div style={{width:52,height:52,borderRadius:14,background:GL,display:'flex',alignItems:'center',justifyContent:'center',fontSize:26}}>{item.icon}</div>
+                <div style={{flex:1}}>
+                  <div style={{fontSize:14,fontWeight:700,color:T1}}>{item.name}</div>
+                  <div style={{fontSize:12,color:T2}}>{item.partner}</div>
+                </div>
+                <button onClick={()=>ok&&redeem(item)} disabled={!ok||busyId===item.id} style={{background:ok?(busyId===item.id?'#E0A0A0':C):'#EEE',color:ok?'#FFF':T3,border:'none',borderRadius:26,padding:'9px 14px',cursor:ok?'pointer':'default',fontSize:12,fontWeight:800,whiteSpace:'nowrap',boxShadow:ok?`0 3px 12px rgba(212,32,32,0.25)`:undefined}}>
+                  {busyId===item.id?'…':`${item.cost} pts`}
+                </button>
               </div>
-              <button style={{background:pts>=item.cost?C:'#EEE',color:pts>=item.cost?'#FFF':T3,border:'none',borderRadius:26,padding:'9px 14px',cursor:'pointer',fontSize:12,fontWeight:800,whiteSpace:'nowrap',boxShadow:pts>=item.cost?`0 3px 12px rgba(212,32,32,0.25)`:undefined}}>
-                {item.cost} pts
-              </button>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
 
       {tab==='history'&&(
         <div style={{padding:'14px 20px 100px',display:'flex',flexDirection:'column',gap:8}}>
-          {[
-            {act:'Visited The Golden Fork',  pts:50,  date:'Today',    icon:'🍽️',earn:true},
-            {act:'Completed Food Challenge', pts:150, date:'Yesterday',icon:'🔥',earn:true},
-            {act:'Visited Heritage Farm',    pts:60,  date:'May 19',   icon:'🌾',earn:true},
-            {act:'Redeemed Bookstore Discount',pts:-300,date:'May 18', icon:'📚',earn:false},
-            {act:'Visited Art Gallery',      pts:65,  date:'May 17',   icon:'🎨',earn:true},
-          ].map((item,i)=>(
-            <div key={i} style={{background:S1,borderRadius:14,padding:'12px 14px',display:'flex',gap:12,alignItems:'center',boxShadow:SH}}>
+          {history.length===0&&(
+            <div style={{textAlign:'center',padding:'40px 20px',color:T3,fontSize:13}}>
+              No activity yet — check in somewhere to start earning! 📍
+            </div>
+          )}
+          {history.map(item=>(
+            <div key={item.id} style={{background:S1,borderRadius:14,padding:'12px 14px',display:'flex',gap:12,alignItems:'center',boxShadow:SH}}>
               <div style={{fontSize:22}}>{item.icon}</div>
               <div style={{flex:1}}><div style={{fontSize:13,fontWeight:600,color:T1}}>{item.act}</div><div style={{fontSize:11,color:T2}}>{item.date}</div></div>
-              <div style={{fontSize:15,fontWeight:900,color:item.earn?'#2E7D32':C}}>{item.earn?'+':''}{item.pts}</div>
+              <div style={{fontSize:15,fontWeight:900,color:item.pts>0?'#2E7D32':C}}>{item.pts>0?'+':''}{item.pts}</div>
             </div>
           ))}
         </div>
@@ -797,23 +1000,28 @@ function RewardsTab() {
 
 // ─── Profile ──────────────────────────────────────────────────────────────────
 function ProfileTab() {
+  const {me,trails,badges,signOut}=useData();
+  const cur=tierFor(me.points);
+  const allLocs=Object.values(trails).flatMap(t=>t.locations);
+  const visited=allLocs.filter(l=>l.visited).length;
+  const earned=badges.filter(b=>b.earned).length;
   return (
     <div style={{height:'100%',overflowY:'auto',background:BG}} className="scroll">
       {/* Header */}
       <div style={{background:S1,borderBottom:`1px solid ${BD}`,padding:'0 20px 24px',textAlign:'center'}}>
         <StatusBar/>
-        <div style={{width:80,height:80,borderRadius:'50%',background:BG,border:`2px solid ${BD}`,margin:'8px auto 12px',display:'flex',alignItems:'center',justifyContent:'center',fontSize:40,boxShadow:SH}}>😊</div>
-        <div style={{fontSize:22,fontWeight:900,color:T1,letterSpacing:-0.3}}>Tiger Explorer</div>
-        <div style={{fontSize:13,color:T2,marginTop:2}}>@tigerexplorer</div>
+        <div style={{width:80,height:80,borderRadius:'50%',background:BG,border:`2px solid ${BD}`,margin:'8px auto 12px',display:'flex',alignItems:'center',justifyContent:'center',fontSize:40,boxShadow:SH}}>{me.avatar}</div>
+        <div style={{fontSize:22,fontWeight:900,color:T1,letterSpacing:-0.3}}>{me.displayName}</div>
+        <div style={{fontSize:13,color:T2,marginTop:2}}>@{me.username}</div>
         <div style={{display:'flex',justifyContent:'center',gap:8,marginTop:10}}>
-          <Pill bg={BG} col={T2} border={BD}>🎓 Sophomore</Pill>
-          <Pill bg={GL} col='#9A7810'>🥈 Silver Tier</Pill>
+          <Pill bg={BG} col={T2} border={BD}>🎓 {me.classification}</Pill>
+          <Pill bg={GL} col='#9A7810'>{cur.icon} {cur.tier} Tier</Pill>
         </div>
       </div>
 
       {/* Stats */}
       <div style={{background:S1,padding:'16px 8px',display:'flex',justifyContent:'space-around',borderBottom:`1px solid ${BD}`}}>
-        {[['⭐','1,540','Points'],['🏅','6','Badges'],['📍','5/14','Visited'],['🏆','#3','Rank']].map(([ic,v,l])=>(
+        {[['⭐',me.points.toLocaleString(),'Points'],['🏅',String(earned),'Badges'],['📍',`${visited}/${allLocs.length}`,'Visited'],['🏆',me.weeklyRank?`#${me.weeklyRank}`:'—','Rank']].map(([ic,v,l])=>(
           <div key={l} style={{textAlign:'center'}}>
             <div style={{fontSize:18,marginBottom:3}}>{ic}</div>
             <div style={{fontSize:18,fontWeight:900,color:C}}>{v}</div>
@@ -825,7 +1033,7 @@ function ProfileTab() {
       {/* Trail progress */}
       <div style={{padding:'20px 20px 0'}}>
         <div style={{fontSize:15,fontWeight:800,color:T1,marginBottom:14,letterSpacing:-0.2}}>Trail Progress</div>
-        {Object.entries(TRAILS).map(([k,t])=>{
+        {Object.entries(trails).map(([k,t])=>{
           const v=t.locations.filter(l=>l.visited).length,tot=t.locations.length,p=Math.round((v/tot)*100);
           return (
             <div key={k} style={{marginBottom:14}}>
@@ -845,7 +1053,7 @@ function ProfileTab() {
       <div style={{padding:'20px 20px 0'}}>
         <div style={{fontSize:15,fontWeight:800,color:T1,marginBottom:14,letterSpacing:-0.2}}>Badges 🏅</div>
         <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:10}}>
-          {BADGES_DATA.map((b,i)=>(
+          {badges.map((b,i)=>(
             <div key={i} style={{background:S1,borderRadius:14,padding:'12px 6px',textAlign:'center',boxShadow:b.earned?SH:undefined,border:`1px solid ${b.earned?G+'25':BD}`,opacity:b.earned?1:0.45}}>
               <div style={{fontSize:26,marginBottom:5,filter:b.earned?'none':'grayscale(1)'}}>{b.icon}</div>
               <div style={{fontSize:9,fontWeight:700,color:b.earned?T1:T3,lineHeight:1.2}}>{b.name}</div>
@@ -860,13 +1068,11 @@ function ProfileTab() {
         <div style={{background:S1,borderRadius:18,overflow:'hidden',boxShadow:SH,border:`1px solid ${BD}`}}>
           {[
             {icon:'🔔',label:'Notifications',val:'On'},
-            {icon:'🔒',label:'Privacy',val:'Friends Only'},
-            {icon:'📱',label:'Phone Number',val:'(334) •••-••25'},
-            {icon:'✉️',label:'Email',val:'tiger@tuskegee.edu'},
+            {icon:'✉️',label:'Email',val:me.email||'—'},
             {icon:'❓',label:'Help & Support'},
-            {icon:'🚪',label:'Sign Out',danger:true},
+            {icon:'🚪',label:'Sign Out',danger:true,onClick:signOut},
           ].map((s,i,arr)=>(
-            <div key={i} style={{padding:'14px 16px',display:'flex',alignItems:'center',gap:12,cursor:'pointer',borderBottom:i<arr.length-1?`1px solid ${BD}`:undefined}}>
+            <div key={i} onClick={s.onClick} style={{padding:'14px 16px',display:'flex',alignItems:'center',gap:12,cursor:'pointer',borderBottom:i<arr.length-1?`1px solid ${BD}`:undefined}}>
               <span style={{fontSize:18}}>{s.icon}</span>
               <span style={{flex:1,fontSize:14,fontWeight:600,color:s.danger?C:T1}}>{s.label}</span>
               {s.val&&<span style={{fontSize:12,color:T3}}>{s.val}</span>}
@@ -884,6 +1090,43 @@ function App() {
   const [screen,setScreen]=useState('splash');
   const [role,setRole]=useState(null);
   const [tab,setTab]=useState('home');
+  const [session,setSession]=useState(null);
+  const [live,setLive]=useState(null);
+
+  // Track the Supabase session
+  useEffect(()=>{
+    if(!db) return;
+    db.auth.getSession().then(({data})=>setSession(data.session));
+    const {data:sub}=db.auth.onAuthStateChange((_e,s)=>setSession(s));
+    return ()=>sub.subscription.unsubscribe();
+  },[]);
+
+  // Load (or reload) live data whenever there's a session
+  const refresh=()=>{
+    if(db) fetchLive().then(setLive).catch(e=>console.warn('live fetch failed, using fallback:',e?.message??e));
+  };
+  useEffect(()=>{ if(session) refresh(); },[session]);
+
+  const signOut=async()=>{
+    if(db) await db.auth.signOut();
+    setLive(null);
+    setTab('home');
+    setScreen('role');
+  };
+
+  // Fallback-merged view of the world for all tabs
+  const data={
+    live: live!=null,
+    me: live?.me ?? ME_FALLBACK,
+    trails: live?.trails ?? TRAILS,
+    challenges: live?.challenges ?? CHALLENGES,
+    acceptedIds: live?.acceptedIds ?? new Set(),
+    badges: live?.badges ?? BADGES_DATA,
+    rewards: live?.rewards ?? REWARDS_FALLBACK,
+    history: live?.history ?? HISTORY_FALLBACK,
+    lb: live?.lb ?? {weekly:LB.weekly, allTime:LB.allTime},
+    refresh, signOut,
+  };
 
   const renderMain=()=>({
     home:        <HomeTab/>,
@@ -895,17 +1138,19 @@ function App() {
   }[tab]||<HomeTab/>);
 
   return (
-    <div class="screen">
-      {screen==='splash' && <Splash onDone={()=>setScreen('role')}/>}
-      {screen==='role'   && <RoleSelect onPick={r=>{setRole(r);setScreen('login');}}/>}
-      {screen==='login'  && <Login role={role} onLogin={()=>setScreen('main')}/>}
-      {screen==='main'   && (
-        <div style={{width:'100%',height:'100%',position:'relative',background:BG}}>
-          <div style={{height:'calc(100% - 82px)',overflow:'hidden'}}>{renderMain()}</div>
-          <TabBar active={tab} onChange={setTab}/>
-        </div>
-      )}
-    </div>
+    <DataCtx.Provider value={data}>
+      <div className="screen">
+        {screen==='splash' && <Splash onDone={()=>setScreen(session?'main':'role')}/>}
+        {screen==='role'   && <RoleSelect onPick={r=>{setRole(r);setScreen('login');}}/>}
+        {screen==='login'  && <Login role={role} onLogin={()=>setScreen('main')}/>}
+        {screen==='main'   && (
+          <div style={{width:'100%',height:'100%',position:'relative',background:BG}}>
+            <div style={{height:'calc(100% - 82px)',overflow:'hidden'}}>{renderMain()}</div>
+            <TabBar active={tab} onChange={setTab}/>
+          </div>
+        )}
+      </div>
+    </DataCtx.Provider>
   );
 }
 

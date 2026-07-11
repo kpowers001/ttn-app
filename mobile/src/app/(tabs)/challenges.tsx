@@ -3,18 +3,23 @@ import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ChallengeCard } from '@/components/challenge-card';
 import { Card, FilterPill } from '@/components/ui';
-import { CHALLENGES, TRAILS } from '@/lib/mock-data';
+import { useChallenges, useTrails } from '@/lib/data';
 import { colors } from '@/lib/theme';
 import type { TrailKey } from '@/lib/types';
 
 export default function ChallengesScreen() {
   const [filter, setFilter] = useState<TrailKey | 'all'>('all');
+  const { data: challenges } = useChallenges();
+  const { data: trails } = useTrails();
   const shown = useMemo(
-    () => (filter === 'all' ? CHALLENGES : CHALLENGES.filter((c) => c.trailKey === filter)),
-    [filter],
+    () => (filter === 'all' ? challenges : challenges.filter((c) => c.trailKey === filter)),
+    [filter, challenges],
   );
-  const activeCount = CHALLENGES.filter((c) => c.active).length;
-  const maxBonus = Math.max(...CHALLENGES.filter((c) => c.active).map((c) => c.bonusPoints));
+  const activeChallenges = challenges.filter((c) => c.active);
+  const activeCount = activeChallenges.length;
+  const maxBonus = activeChallenges.length
+    ? Math.max(...activeChallenges.map((c) => c.bonusPoints))
+    : 0;
 
   return (
     <SafeAreaView style={styles.screen} edges={['top']}>
@@ -26,7 +31,7 @@ export default function ChallengesScreen() {
       <View style={styles.filterBar}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterRow}>
           <FilterPill label="⚡ All" active={filter === 'all'} onPress={() => setFilter('all')} />
-          {TRAILS.map((t) => (
+          {trails.map((t) => (
             <FilterPill
               key={t.key}
               label={`${t.icon} ${t.name.replace(/ Trail| & Nature| & Culture/g, '')}`}

@@ -2,20 +2,25 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Card, Pill, ProgressBar } from '@/components/ui';
 import { useAuth } from '@/lib/auth-context';
-import { BADGES, LOCATIONS, ME, TRAILS, tierForPoints } from '@/lib/mock-data';
+import { useBadges, useLocations, useMe, useTrails } from '@/lib/data';
+import { tierForPoints } from '@/lib/mock-data';
 import { colors } from '@/lib/theme';
 
 export default function ProfileScreen() {
   const { email, signOut } = useAuth();
-  const tier = tierForPoints(ME.points);
-  const visitedCount = LOCATIONS.filter((l) => l.visited).length;
-  const earnedBadges = BADGES.filter((b) => b.earned).length;
+  const { data: me } = useMe();
+  const { data: badges } = useBadges();
+  const { data: locations } = useLocations();
+  const { data: trails } = useTrails();
+  const tier = tierForPoints(me.points);
+  const visitedCount = locations.filter((l) => l.visited).length;
+  const earnedBadges = badges.filter((b) => b.earned).length;
 
   const stats: [string, string, string][] = [
-    ['⭐', ME.points.toLocaleString(), 'Points'],
+    ['⭐', me.points.toLocaleString(), 'Points'],
     ['🏅', String(earnedBadges), 'Badges'],
-    ['📍', `${visitedCount}/${LOCATIONS.length}`, 'Visited'],
-    ['🏆', `#${ME.weeklyRank}`, 'Rank'],
+    ['📍', `${visitedCount}/${locations.length}`, 'Visited'],
+    ['🏆', me.weeklyRank ? `#${me.weeklyRank}` : '—', 'Rank'],
   ];
 
   return (
@@ -23,12 +28,12 @@ export default function ProfileScreen() {
       <ScrollView showsVerticalScrollIndicator={false}>
         <View style={styles.header}>
           <View style={styles.avatar}>
-            <Text style={{ fontSize: 40 }}>{ME.avatar}</Text>
+            <Text style={{ fontSize: 40 }}>{me.avatar}</Text>
           </View>
-          <Text style={styles.name}>{ME.displayName}</Text>
-          <Text style={styles.username}>@{ME.username}</Text>
+          <Text style={styles.name}>{me.displayName}</Text>
+          <Text style={styles.username}>@{me.username}</Text>
           <View style={styles.headerPills}>
-            <Pill label={`🎓 ${ME.classification}`} bg={colors.bg} color={colors.inkSecondary} borderColor={colors.border} />
+            <Pill label={`🎓 ${me.classification}`} bg={colors.bg} color={colors.inkSecondary} borderColor={colors.border} />
             <Pill label={`${tier.icon} ${tier.name} Tier`} />
           </View>
         </View>
@@ -45,8 +50,8 @@ export default function ProfileScreen() {
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Trail Progress</Text>
-          {TRAILS.map((t) => {
-            const locs = LOCATIONS.filter((l) => l.trailKey === t.key);
+          {trails.map((t) => {
+            const locs = locations.filter((l) => l.trailKey === t.key);
             const visited = locs.filter((l) => l.visited).length;
             const pct = locs.length ? Math.round((visited / locs.length) * 100) : 0;
             const complete = pct === 100;
@@ -70,7 +75,7 @@ export default function ProfileScreen() {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Badges 🏅</Text>
           <View style={styles.badgeGrid}>
-            {BADGES.map((b) => (
+            {badges.map((b) => (
               <View key={b.id} style={[styles.badgeCell, !b.earned && styles.badgeCellLocked]}>
                 <Text style={[styles.badgeIcon, !b.earned && { opacity: 0.35 }]}>{b.icon}</Text>
                 <Text style={[styles.badgeName, !b.earned && { color: colors.inkMuted }]}>

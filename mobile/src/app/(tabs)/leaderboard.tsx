@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Card } from '@/components/ui';
-import { LEADERBOARD } from '@/lib/mock-data';
+import { useLeaderboard } from '@/lib/data';
 import { colors } from '@/lib/theme';
 import type { LeaderboardEntry, LeaderboardPeriod } from '@/lib/types';
 
@@ -15,7 +15,7 @@ const MEDAL_COLORS: Record<number, string> = { 1: colors.gold, 2: '#AAAAAA', 3: 
 
 export default function LeaderboardScreen() {
   const [period, setPeriod] = useState<LeaderboardPeriod>('weekly');
-  const data = LEADERBOARD[period];
+  const { data } = useLeaderboard(period);
   const podium = data.slice(0, 3);
 
   return (
@@ -53,7 +53,7 @@ export default function LeaderboardScreen() {
         <View style={styles.list}>
           {data.map((entry) => (
             <Card
-              key={`${period}-${entry.rank}`}
+              key={`${period}-${entry.name}`}
               style={{
                 ...styles.rowCard,
                 ...(entry.isMe ? { backgroundColor: colors.goldLight, borderWidth: 1, borderColor: `${colors.gold}30` } : {}),

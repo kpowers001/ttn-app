@@ -4,34 +4,37 @@ import { useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Card, FilterPill, Pill, ProgressBar } from '@/components/ui';
-import { LOCATIONS, TRAILS, trailByKey } from '@/lib/mock-data';
+import { useLocations, useTrails } from '@/lib/data';
+import { trailByKey } from '@/lib/mock-data';
 import { colors } from '@/lib/theme';
 import type { TrailKey } from '@/lib/types';
 
 export default function MapScreenWeb() {
   const [trailFilter, setTrailFilter] = useState<TrailKey | 'all'>('all');
+  const { data: locations } = useLocations();
+  const { data: trails } = useTrails();
   const shown = useMemo(
-    () => (trailFilter === 'all' ? LOCATIONS : LOCATIONS.filter((l) => l.trailKey === trailFilter)),
-    [trailFilter],
+    () => (trailFilter === 'all' ? locations : locations.filter((l) => l.trailKey === trailFilter)),
+    [trailFilter, locations],
   );
-  const visitedCount = LOCATIONS.filter((l) => l.visited).length;
+  const visitedCount = locations.filter((l) => l.visited).length;
 
   return (
     <SafeAreaView style={styles.screen} edges={['top']}>
       <View style={styles.header}>
         <Text style={styles.title}>Explore 🗺️</Text>
         <Text style={styles.subtitle}>
-          {visitedCount}/{LOCATIONS.length} locations discovered · map renders on device
+          {visitedCount}/{locations.length} locations discovered · map renders on device
         </Text>
         <View style={{ marginTop: 10 }}>
-          <ProgressBar pct={(visitedCount / LOCATIONS.length) * 100} height={5} />
+          <ProgressBar pct={(visitedCount / locations.length) * 100} height={5} />
         </View>
       </View>
 
       <View style={styles.filterBar}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterRow}>
           <FilterPill label="🗺️ All" active={trailFilter === 'all'} onPress={() => setTrailFilter('all')} />
-          {TRAILS.map((t) => (
+          {trails.map((t) => (
             <FilterPill
               key={t.key}
               label={`${t.icon} ${t.name.replace(/ Trail| & Nature| & Culture/g, '')}`}
