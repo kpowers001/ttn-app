@@ -206,8 +206,8 @@ async function fetchLive() {
   const [profileQ, pointsQ, weeklyQ, allTimeQ, trailsQ, locsQ, visitsQ, chQ, acceptsQ, badgesQ, myBadgesQ, badgeCountsQ, rewardsQ, ledgerQ] = await Promise.all([
     db.from('profiles').select('username,classification,avatar').eq('id', uid).single(),
     db.from('user_points').select('balance').eq('user_id', uid).maybeSingle(),
-    db.from('weekly_leaderboard').select('*').order('rank').order('username').limit(25),
-    db.from('alltime_leaderboard').select('*').order('rank').order('username').limit(25),
+    db.rpc('get_leaderboard', {p_period:'weekly'}),
+    db.rpc('get_leaderboard', {p_period:'alltime'}),
     db.from('trails').select('*').order('sort_order'),
     db.from('locations').select('*').eq('active', true),
     db.from('visits').select('location_id'),
@@ -272,8 +272,8 @@ async function fetchLive() {
     rewards: rewardsQ.data.map(r => ({id:r.id, name:r.name, cost:r.cost_points, icon:r.icon, partner:r.partner})),
     history: (ledgerQ.data ?? []).map(l => ({id:String(l.id), act:l.reason, pts:l.delta, date:fmtLedgerDate(l.created_at), icon:LEDGER_ICONS[l.ref_type] ?? '⭐'})),
     lb: {
-      weekly: (weeklyQ.data ?? []).map(lbRow),
-      allTime: (allTimeQ.data ?? []).map(lbRow),
+      weekly: (weeklyQ.data ?? []).map(lbRow).sort((a,b)=>a.rank-b.rank||a.name.localeCompare(b.name)),
+      allTime: (allTimeQ.data ?? []).map(lbRow).sort((a,b)=>a.rank-b.rank||a.name.localeCompare(b.name)),
     },
   };
 }
