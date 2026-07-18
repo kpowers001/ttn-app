@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>Tuskegee Trail Network</title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
@@ -18,23 +18,23 @@
   </script>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+    html, body, #root { height: 100%; }
     body {
       font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-      background: #E8E8E8;
-      display: flex; justify-content: center; align-items: center;
-      min-height: 100vh; padding: 24px;
+      background: #F5F5F5;
     }
-    .phone {
-      width: 390px; height: 844px; background: #FFFFFF;
-      border-radius: 52px; overflow: hidden; position: relative;
-      box-shadow: 0 8px 48px rgba(0,0,0,0.18), 0 0 0 1px rgba(0,0,0,0.06);
+    .screen {
+      width: 100%; height: 100dvh; overflow: hidden; position: relative;
+      background: #F5F5F5; margin: 0 auto;
     }
-    .notch {
-      position: absolute; top: 0; left: 50%; transform: translateX(-50%);
-      width: 126px; height: 34px; background: #111;
-      border-radius: 0 0 20px 20px; z-index: 999;
+    /* On large screens, keep a readable app column instead of stretching */
+    @media (min-width: 640px) {
+      body { background: #E8E8E8; }
+      .screen {
+        max-width: 480px;
+        box-shadow: 0 0 40px rgba(0,0,0,0.10);
+      }
     }
-    .screen { width: 100%; height: 100%; overflow: hidden; position: relative; background: #F5F5F5; }
     .scroll { overflow-y: auto; -webkit-overflow-scrolling: touch; }
     .scroll::-webkit-scrollbar { display: none; }
     @keyframes fadeUp { from { opacity:0; transform:translateY(14px); } to { opacity:1; transform:translateY(0); } }
@@ -47,10 +47,7 @@
   </style>
 </head>
 <body>
-<div class="phone">
-  <div class="notch"></div>
-  <div id="root" style="width:100%;height:100%"></div>
-</div>
+<div id="root"></div>
 
 <script type="text/babel" data-presets="react-classic">
 const { useState, useEffect, useRef } = React;
@@ -282,13 +279,10 @@ const DataCtx = React.createContext(null);
 const useData = () => React.useContext(DataCtx);
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
+// Spacer under the device's real status bar (notch-safe), replaces the old
+// fake time/wifi/battery bar.
 const StatusBar = () => (
-  <div style={{height:44,display:'flex',alignItems:'center',justifyContent:'space-between',padding:'8px 24px 0',fontSize:13,fontWeight:600,color:T1}}>
-    <span>9:41</span>
-    <div style={{display:'flex',gap:5,alignItems:'center',fontSize:11}}>
-      <span>●●●</span><span>WiFi</span><span>🔋</span>
-    </div>
-  </div>
+  <div style={{height:'env(safe-area-inset-top)',minHeight:14}}/>
 );
 
 const Pill = ({children,bg,col,border}) => (
@@ -438,7 +432,7 @@ const TABS = [
 
 function TabBar({active,onChange}) {
   return (
-    <div style={{position:'absolute',bottom:0,left:0,right:0,height:82,background:S1,borderTop:`1px solid ${BD}`,display:'flex',alignItems:'flex-start',paddingTop:10,zIndex:200,boxShadow:'0 -2px 12px rgba(0,0,0,0.06)'}}>
+    <div style={{position:'absolute',bottom:0,left:0,right:0,height:'calc(70px + env(safe-area-inset-bottom))',paddingBottom:'env(safe-area-inset-bottom)',background:S1,borderTop:`1px solid ${BD}`,display:'flex',alignItems:'flex-start',paddingTop:10,zIndex:200,boxShadow:'0 -2px 12px rgba(0,0,0,0.06)'}}>
       {TABS.map(t=>{
         const on=active===t.id;
         return (
@@ -1092,6 +1086,8 @@ function App() {
   const [tab,setTab]=useState('home');
   const [session,setSession]=useState(null);
   const [live,setLive]=useState(null);
+  const sessionRef=useRef(null);
+  sessionRef.current=session;
 
   // Track the Supabase session
   useEffect(()=>{
@@ -1140,12 +1136,12 @@ function App() {
   return (
     <DataCtx.Provider value={data}>
       <div className="screen">
-        {screen==='splash' && <Splash onDone={()=>setScreen(session?'main':'role')}/>}
+        {screen==='splash' && <Splash onDone={()=>setScreen(sessionRef.current?'main':'role')}/>}
         {screen==='role'   && <RoleSelect onPick={r=>{setRole(r);setScreen('login');}}/>}
         {screen==='login'  && <Login role={role} onLogin={()=>setScreen('main')}/>}
         {screen==='main'   && (
           <div style={{width:'100%',height:'100%',position:'relative',background:BG}}>
-            <div style={{height:'calc(100% - 82px)',overflow:'hidden'}}>{renderMain()}</div>
+            <div style={{height:'calc(100% - 70px - env(safe-area-inset-bottom))',overflow:'hidden'}}>{renderMain()}</div>
             <TabBar active={tab} onChange={setTab}/>
           </div>
         )}
