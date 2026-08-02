@@ -74,20 +74,20 @@ const db = window.supabase ? window.supabase.createClient(SUPABASE_URL, SUPABASE
 // ─── Data ─────────────────────────────────────────────────────────────────────
 const TRAILS = {
   food: { name:'Food Trail', icon:'🍽️', color:'#D44000', locations:[
-    {id:'f1', name:'B&B Barbecue',          desc:'Classic Alabama BBQ & smoked meats',              lat:32.4193, lng:-85.6951, visited:true,  pts:50},
-    {id:'f2', name:'New House of Stewarts', desc:'Southern cuisine & event venue on W MLK Hwy',     lat:32.4218, lng:-85.7198, visited:false, pts:50},
+    {id:'f1', name:'B&B Barbecue',          desc:'Classic Alabama BBQ & smoked meats',              lat:32.42516, lng:-85.69637, visited:true,  pts:50, address:'405 Fonville St, Tuskegee, AL 36083', hours:'Wed–Sat 11 AM–12 AM · Sun 11 AM–8 PM'},
+    {id:'f2', name:'New House of Stewarts', desc:'Southern cuisine & event venue on W MLK Hwy',     lat:32.40556, lng:-85.71881, visited:false, pts:50, address:'2801 W Martin Luther King Hwy, Tuskegee, AL 36083', hours:'Mon–Tue 11 AM–4 PM · Wed–Sat 11 AM–9 PM · Sun 2–9 PM'},
   ]},
   history: { name:'History Trail', icon:'🏛️', color:'#8B1A1A', locations:[
-    {id:'h1', name:'Tuskegee Airmen NHS',   desc:'Historic Moton Field · Wed–Sat 9 AM–4:30 PM',    lat:32.4604, lng:-85.6764, visited:true,  pts:75},
-    {id:'h2', name:'G.W. Carver Museum',    desc:'NPS visitor center on campus · free admission',   lat:32.4247, lng:-85.7088, visited:false, pts:75},
+    {id:'h1', name:'Tuskegee Airmen NHS',   desc:'Historic Moton Field',                            lat:32.45710, lng:-85.67984, visited:true,  pts:75, address:'1616 Chappie James Ave, Tuskegee, AL 36083', hours:'Wed–Sat 9 AM–4:30 PM · Free admission'},
+    {id:'h2', name:'G.W. Carver Museum',    desc:'NPS visitor center on campus',                    lat:32.42887, lng:-85.70844, visited:false, pts:75, address:'1212 W Montgomery Rd, Tuskegee, AL 36088', hours:'Mon–Sat 9 AM–4:30 PM · Campus pass required'},
   ]},
   farm: { name:'Farm Trail', icon:'🌾', color:'#2E7D32', locations:[
-    {id:'fa1', name:'Macon County Farmers Market', desc:'Wed & Sat 8 AM–2 PM · May through Sep',   lat:32.4163, lng:-85.6943, visited:false, pts:60},
-    {id:'fa2', name:'Shady Grove Blueberry Patch', desc:'U-pick blueberries · County Road 81',     lat:32.3892, lng:-85.6845, visited:true,  pts:60},
+    {id:'fa1', name:'Macon County Farmers Market', desc:'Local produce, downtown',                  lat:32.42430, lng:-85.69130, visited:false, pts:60, address:'Elm St & Spring St, downtown Tuskegee', hours:'Wed & Sat 8 AM–2 PM · May–Sep'},
+    {id:'fa2', name:'Shady Grove Blueberry Patch', desc:'U-pick blueberries',                       lat:32.3892, lng:-85.6845, visited:true,  pts:60, address:'690 County Road 81, Tuskegee, AL 36083', hours:'Mon–Sat 8 AM–12 PM & 5–7 PM · Late May–late Jul · Cash only'},
     {id:'fa3', name:'Tuskegee Honey',              desc:'Raw wildflower honey · find at Farmers Market', lat:32.4160, lng:-85.6958, visited:false, pts:60},
   ]},
   arts: { name:'Arts Trail', icon:'🎨', color:'#6A1B9A', locations:[
-    {id:'a1', name:'Legacy Museum',         desc:'TU art collections & bioethics exhibits',         lat:32.4252, lng:-85.7063, visited:true,  pts:65},
+    {id:'a1', name:'Legacy Museum',         desc:'TU art collections & bioethics exhibits',         lat:32.43011, lng:-85.70673, visited:true,  pts:65, address:'1200 W Montgomery Rd, Kenney Hall, TU campus', hours:'Call ahead · Campus pass required'},
   ]},
 };
 
@@ -228,6 +228,7 @@ async function fetchLive() {
     trails[l.trail_id]?.locations.push({
       id:l.id, name:l.name, desc:l.description, lat:l.lat, lng:l.lng,
       pts:l.points, radiusM:l.radius_m, visited:visited.has(l.id),
+      address:l.address, hours:l.hours,
     });
   }
 
@@ -639,10 +640,12 @@ function MapTab() {
     if (!mapDivRef.current || leafletRef.current || !window.L) return;
     const map = window.L.map(mapDivRef.current, {
       zoomControl: false,
-      attributionControl: false,
+      attributionControl: true,
     });
-    window.L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      maxZoom: 19,
+    map.attributionControl.setPrefix('');
+    window.L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+      maxZoom: 20,
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/attributions">CARTO</a>',
     }).addTo(map);
     // Fit all 8 confirmed locations
     const bounds = window.L.latLngBounds(allLocs.map(l => [l.lat, l.lng]));
@@ -706,12 +709,29 @@ function MapTab() {
                   <span style={{fontSize:16,fontWeight:800,color:T1}}>{sel.name}</span>
                 </div>
                 <div style={{fontSize:13,color:T2,marginBottom:10}}>{sel.desc}</div>
+                {sel.address&&(
+                  <div style={{display:'flex',gap:7,alignItems:'flex-start',marginBottom:5}}>
+                    <span style={{fontSize:12,lineHeight:'17px'}}>📍</span>
+                    <span style={{fontSize:12,color:T2,lineHeight:1.4}}>{sel.address}</span>
+                  </div>
+                )}
+                {sel.hours&&(
+                  <div style={{display:'flex',gap:7,alignItems:'flex-start',marginBottom:10}}>
+                    <span style={{fontSize:12,lineHeight:'17px'}}>🕐</span>
+                    <span style={{fontSize:12,color:T2,lineHeight:1.4}}>{sel.hours}</span>
+                  </div>
+                )}
                 <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
                   {sel.visited
                     ? <><Pill bg='#E8F5E9' col='#2E7D32'>✓ Visited</Pill><Pill bg={GL} col='#9A7810'>+{sel.pts} pts earned</Pill></>
                     : <Pill bg='#FFF3E0' col='#BF360C'>🔒 Visit to unlock · +{sel.pts} pts</Pill>
                   }
                 </div>
+                <a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(sel.address&&!sel.address.startsWith('Find')&&!sel.address.startsWith('Address')?sel.name+', '+sel.address:sel.lat+','+sel.lng)}`}
+                   target="_blank" rel="noopener"
+                   style={{display:'block',textAlign:'center',marginTop:10,padding:'11px',background:'#F0F4FF',color:'#1A56DB',border:'1px solid #D0DCFF',borderRadius:24,fontSize:13,fontWeight:800,textDecoration:'none'}}>
+                  🗺️ Open in Google Maps
+                </a>
                 {!sel.visited&&db&&(
                   <button onClick={()=>checkIn(sel)} disabled={checking} style={{marginTop:12,width:'100%',background:checking?'#E0A0A0':C,color:'#FFF',border:'none',borderRadius:24,padding:'12px',fontSize:13,fontWeight:800,cursor:checking?'default':'pointer',boxShadow:'0 4px 14px rgba(212,32,32,0.25)'}}>
                     {checking?'Checking in…':'📍 Check In Here'}
