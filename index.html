@@ -179,7 +179,7 @@ const HISTORY_FALLBACK = [
   {id:'h4', act:'Redeemed Bookstore Discount',pts:-300, date:'May 18',    icon:'📚'},
 ];
 
-const fmtDeadline = iso => new Date(iso).toLocaleDateString('en-US',{month:'short',day:'numeric'});
+const fmtDeadline = iso => new Date(iso).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
 const fmtExpires = iso => {
   const days = Math.ceil((new Date(iso).getTime() - Date.now()) / 86400000);
   if (days <= 0) return 'Today';
@@ -200,7 +200,7 @@ async function fetchLive() {
   const email = (await db.auth.getUser()).data.user?.email ?? '';
   if (!uid) throw new Error('no session');
 
-  const [profileQ, pointsQ, weeklyQ, allTimeQ, trailsQ, locsQ, visitsQ, chQ, acceptsQ, badgesQ, myBadgesQ, badgeCountsQ, rewardsQ, ledgerQ] = await Promise.all([
+  const [profileQ, pointsQ, weeklyQ, allTimeQ, trailsQ, locsQ, visitsQ, chQ, acceptsQ, participantsQ, badgesQ, myBadgesQ, badgeCountsQ, rewardsQ, ledgerQ] = await Promise.all([
     db.from('profiles').select('username,classification,avatar').eq('id', uid).single(),
     db.from('user_points').select('balance').eq('user_id', uid).maybeSingle(),
     db.rpc('get_leaderboard', {p_period:'weekly'}),
@@ -210,6 +210,7 @@ async function fetchLive() {
     db.from('visits').select('location_id'),
     db.from('challenges_with_state').select('*').order('starts_at'),
     db.from('challenge_accepts').select('challenge_id'),
+    db.rpc('get_challenge_participants'),
     db.from('badges').select('*').order('id'),
     db.from('user_badges').select('badge_id').eq('user_id', uid),
     db.from('user_badges').select('user_id'),
@@ -233,11 +234,12 @@ async function fetchLive() {
   }
 
   const acceptedIds = new Set((acceptsQ.data ?? []).map(a => a.challenge_id));
+  const pCounts = new Map((participantsQ.data ?? []).map(r => [r.challenge_id, Number(r.participants)]));
   const challenges = chQ.data.map(c => ({
     id:c.id, title:c.title, biz:c.business_name, type:c.trail_id,
     locationId:c.location_id, pts:c.bonus_points, icon:c.icon, badge:c.badge_icon,
     active:c.active, expires:fmtExpires(c.active ? c.ends_at : c.starts_at),
-    deadline:fmtDeadline(c.ends_at), participants:null,
+    deadline:fmtDeadline(c.ends_at), participants:pCounts.get(c.id) ?? 0,
     desc:`Visit ${c.business_name} while this challenge is live to earn the bonus.`,
   }));
 
