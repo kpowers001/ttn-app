@@ -500,19 +500,12 @@ function HomeTab() {
         <div style={{display:'flex',gap:10,padding:'0 20px',overflowX:'auto',paddingBottom:4}} className="scroll">
           {STORIES.map(s=>(
             <div key={s.id} style={{flexShrink:0,cursor:'pointer',width:100}}>
-              {/* Rectangular video thumbnail */}
-              <div style={{width:100,height:148,borderRadius:14,background:`linear-gradient(160deg,${s.bg1} 0%,${s.bg2} 100%)`,position:'relative',overflow:'hidden',boxShadow:`0 4px 14px ${s.accent}40`}}>
-                {/* Colored top-edge indicator (new story) */}
-                <div style={{position:'absolute',top:0,left:0,right:0,height:3,background:s.accent,borderRadius:'14px 14px 0 0'}}/>
-                {/* Subtle top vignette */}
-                <div style={{position:'absolute',top:0,left:0,right:0,height:50,background:'linear-gradient(rgba(0,0,0,0.28),transparent)'}}/>
-                {/* Video camera badge */}
-                <div style={{position:'absolute',top:9,left:9,fontSize:11,background:'rgba(0,0,0,0.38)',borderRadius:6,padding:'2px 5px',color:'#FFF',fontWeight:700,letterSpacing:0.2}}>🎥</div>
-                {/* Avatar centered */}
-                <div style={{position:'absolute',top:'50%',left:'50%',transform:'translate(-50%,-55%)',fontSize:46,lineHeight:1,userSelect:'none'}}>{s.av}</div>
-                {/* Bottom gradient + play button */}
-                <div style={{position:'absolute',bottom:0,left:0,right:0,height:52,background:'linear-gradient(transparent,rgba(0,0,0,0.55))'}}/>
-                <div style={{position:'absolute',bottom:8,right:8,width:24,height:24,borderRadius:'50%',background:'rgba(255,255,255,0.88)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:9,paddingLeft:2}}>▶</div>
+              {/* Placeholder tile until partner videos are filmed */}
+              <div style={{width:100,height:148,borderRadius:14,background:`linear-gradient(160deg,${s.bg1} 0%,${s.bg2} 100%)`,position:'relative',overflow:'hidden',boxShadow:`0 4px 14px ${s.accent}40`,display:'flex',alignItems:'center',justifyContent:'center'}}>
+                <div style={{position:'absolute',inset:0,background:'rgba(0,0,0,0.18)'}}/>
+                <div style={{position:'relative',textAlign:'center',padding:'0 10px'}}>
+                  <div style={{fontSize:12,fontWeight:800,color:'#FFF',lineHeight:1.35,textShadow:'0 1px 6px rgba(0,0,0,0.35)',letterSpacing:0.2}}>Stories<br/>coming<br/>soon</div>
+                </div>
               </div>
               {/* Text below */}
               <div style={{marginTop:8,paddingRight:4}}>
