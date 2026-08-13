@@ -142,11 +142,11 @@ const TIERS = [
 ];
 
 const STORIES = [
-  {id:1, meet:'Ms. Josie',    biz:'Shady Grove Blueberry Patch', av:'👩🏾‍🌾', bg1:'#1A4A1E', bg2:'#4A9E52', accent:'#2E7D32'},
-  {id:2, meet:'Chef Marcus',  biz:'The Golden Fork',             av:'👨🏿‍🍳', bg1:'#B03A00', bg2:'#E8722A', accent:'#D44000'},
-  {id:3, meet:'Dr. Williams', biz:'G.W. Carver Museum',          av:'👨🏾‍🏫', bg1:'#5C0E0E', bg2:'#A83030', accent:'#8B1A1A'},
-  {id:4, meet:'Maya Chen',    biz:'Tuskegee Art Gallery',        av:'👩🏽‍🎨', bg1:'#3A0060', bg2:'#9040B8', accent:'#6A1B9A'},
-  {id:5, meet:'Coach T.',     biz:'TU Athletics Dept.',          av:'👨🏾‍💼', bg1:'#7A5A00', bg2:'#C8A415', accent:'#C8A415'},
+  {id:1, meet:'Meet Ms. Josie',         bg1:'#1A4A1E', bg2:'#4A9E52', accent:'#2E7D32'},
+  {id:2, meet:'Mrs. King',              bg1:'#5C0E0E', bg2:'#A83030', accent:'#8B1A1A'},
+  {id:3, meet:'Mr. B',                  bg1:'#B03A00', bg2:'#E8722A', accent:'#D44000'},
+  {id:4, meet:'Ms. Taylor & the Bees',  bg1:'#7A5A00', bg2:'#C8A415', accent:'#C8A415'},
+  {id:5, meet:'Dragons in Tuskegee?!',  bg1:'#3A0060', bg2:'#9040B8', accent:'#6A1B9A'},
 ];
 
 const BADGES_DATA = [
@@ -486,17 +486,13 @@ function ChallengeProductCard({ch,trail}) {
 
 function HomeTab() {
   const {me,challenges,trails}=useData();
-  const [query,setQuery]=useState('');
-  const [chip,setChip]=useState('all');
   const [slide,setSlide]=useState(0);
   const cur=tierFor(me.points);
   const nxt=TIERS[TIERS.indexOf(cur)+1];
   const pct=nxt?Math.round(((me.points-cur.min)/(nxt.min-cur.min))*100):100;
 
-  const q=query.trim().toLowerCase();
-  const match=c=>(chip==='all'||c.type===chip)&&(!q||c.title.toLowerCase().includes(q)||c.biz.toLowerCase().includes(q));
-  const activeList=challenges.filter(c=>c.active&&match(c));
-  const upcoming=challenges.filter(c=>!c.active&&match(c));
+  const activeList=challenges.filter(c=>c.active);
+  const upcoming=challenges.filter(c=>!c.active);
   const featured=challenges.find(c=>c.active);
   const fpc=featured?(PHOTO_CFG[featured.type]||{bg1:DC,bg2:C}):null;
 
@@ -517,25 +513,6 @@ function HomeTab() {
             <div style={{fontSize:22,fontWeight:800,color:T1,letterSpacing:-0.4}}>{me.displayName}</div>
           </div>
           <div style={{width:40,height:40,borderRadius:'50%',background:G2,display:'flex',alignItems:'center',justifyContent:'center',fontSize:20}}>{me.avatar}</div>
-        </div>
-
-        {/* Search */}
-        <div style={{display:'flex',alignItems:'center',gap:10,background:G2,borderRadius:12,padding:'12px 14px'}}>
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#6E6E6E" strokeWidth="2" strokeLinecap="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
-          <input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Search challenges & places" aria-label="Search challenges and places"
-            style={{flex:1,border:'none',outline:'none',background:'transparent',fontSize:15,color:T1}}/>
-        </div>
-
-        {/* Trail chips */}
-        <div style={{display:'flex',gap:8,margin:'12px -20px 0',padding:'0 20px 2px',overflowX:'auto'}} className="scroll">
-          {[['all','All',null],...Object.entries(trails).map(([k,t])=>[k,t.name.replace(' Trail','').replace(' & Nature','').replace(' & Culture',''),t.icon])].map(([k,label,ic])=>{
-            const on=chip===k;
-            return (
-              <button key={k} onClick={()=>setChip(k)} style={{flexShrink:0,display:'flex',alignItems:'center',gap:6,padding:'8px 14px',borderRadius:20,border:`1px solid ${on?'#111':'#DDDDDD'}`,background:on?'#111':'#FFF',color:on?'#FFF':T1,fontSize:13,fontWeight:600,cursor:'pointer'}}>
-                {ic&&<span style={{fontSize:13}}>{ic}</span>}{label}
-              </button>
-            );
-          })}
         </div>
 
         {/* Banner carousel */}
@@ -567,7 +544,7 @@ function HomeTab() {
       <SH2 title="Stories"/>
       <div style={{display:'flex',gap:16,padding:'0 20px 2px',overflowX:'auto'}} className="scroll">
         {STORIES.map(st=>(
-          <div key={st.id} style={{flexShrink:0,width:74,textAlign:'center'}}>
+          <div key={st.id} style={{flexShrink:0,width:86,textAlign:'center'}}>
             <div style={{width:72,height:72,borderRadius:'50%',background:`linear-gradient(160deg,${st.bg1} 0%,${st.bg2} 100%)`,display:'flex',alignItems:'center',justifyContent:'center',marginBottom:7}}>
               <div style={{fontSize:9,fontWeight:800,color:'#FFF',lineHeight:1.3,textShadow:'0 1px 4px rgba(0,0,0,0.3)'}}>Coming<br/>soon</div>
             </div>
@@ -580,7 +557,7 @@ function HomeTab() {
       <SH2 title="Active challenges"/>
       {activeList.length===0
         ? <div style={{margin:'0 20px',padding:'22px 18px',background:G2,borderRadius:14,fontSize:13,color:T2,lineHeight:1.5}}>
-            No active challenges{chip!=='all'||q?' match this filter':''} right now. New ones appear here the moment a partner posts them — check Coming up below.
+            No active challenges right now. New ones appear here the moment a partner posts them; check Coming up below.
           </div>
         : <div style={{display:'flex',gap:14,padding:'0 20px 4px',overflowX:'auto'}} className="scroll">
             {activeList.map(ch=><ChallengeProductCard key={ch.id} ch={ch} trail={trails[ch.type]}/>)}
