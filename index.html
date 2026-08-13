@@ -120,7 +120,7 @@ const ALL_LOCS = Object.entries(TRAILS).flatMap(([k,t])=>t.locations.map(l=>({..
 
 const CHALLENGES = [
   // ── Active ──
-  {id:1, title:'Friday Night Pit Special',  biz:'B&B Barbecue',                type:'food',    pts:150, expires:'2 days',   deadline:'Jul 11', participants:24, desc:'Visit the legendary B&B pit on Fonville St and taste classic Alabama smoked meats.',             icon:'🍖', badge:'🔥', active:true},
+  {id:1, title:'Friday Night Pit Special',  biz:'B&B Barbecue',                type:'food',    pts:150, expires:'2 days',   deadline:'Jul 11', participants:24, desc:'Visit the legendary B&B pit on Fonville St and taste classic Alabama smoked meats.',             icon:'🍖', badge:'🔥', active:true, photo:'photos/bb-barbecue.jpg'},
   {id:2, title:'Pick Before Season Ends',   biz:'Shady Grove Blueberry Patch', type:'farm',    pts:200, expires:'4 days',   deadline:'Jul 13', participants:12, desc:'Head to County Road 81 and pick fresh blueberries straight from the vine before the season closes.', icon:'🫐', badge:'🌱', active:true},
   {id:3, title:'Art & Ethics Walk',         biz:'Legacy Museum',               type:'arts',    pts:175, expires:'Tomorrow', deadline:'Jul 9',  participants:31, desc:'Tour the TU Legacy Museum — student art collections and groundbreaking bioethics research on campus.', icon:'🎨', badge:'🎭', active:true},
   // ── Coming Up ──
@@ -264,7 +264,7 @@ async function fetchLive() {
     id:c.id, title:c.title, biz:c.business_name, type:c.trail_id,
     locationId:c.location_id, pts:c.bonus_points, icon:c.icon, badge:c.badge_icon,
     active:c.active, expires:fmtExpires(c.active ? c.ends_at : c.starts_at),
-    deadline:fmtDeadline(c.ends_at), participants:pCounts.get(c.id) ?? 0,
+    deadline:fmtDeadline(c.ends_at), participants:pCounts.get(c.id) ?? 0, photo:c.photo||'',
     desc:`Visit ${c.business_name} while this challenge is live to earn the bonus.`,
   }));
 
@@ -484,6 +484,17 @@ function TabBar({active,onChange}) {
 // ─── Home ─────────────────────────────────────────────────────────────────────
 const tierFor = pts => TIERS.find(t=>pts>=t.min&&pts<=t.max) ?? TIERS[0];
 
+// Renders a partner photo above the trail gradient. If the file is missing or
+// slow, the gradient underneath is what shows, so cards never break.
+function ChallengePhoto({ch}) {
+  if(!ch.photo) return null;
+  return (
+    <img src={ch.photo} alt="" aria-hidden="true"
+      onError={e=>{e.currentTarget.style.display='none';}}
+      style={{position:'absolute',inset:0,width:'100%',height:'100%',objectFit:'cover'}}/>
+  );
+}
+
 function ChallengeProductCard({ch,trail}) {
   const {acceptedIds,refresh}=useData();
   const [busy,setBusy]=useState(false);
@@ -501,11 +512,12 @@ function ChallengeProductCard({ch,trail}) {
   return (
     <div style={{width:200,flexShrink:0}}>
       <div style={{height:140,borderRadius:14,background:`linear-gradient(145deg,${pc.bg1} 0%,${pc.bg2} 100%)`,position:'relative',overflow:'hidden',marginBottom:10}}>
-        <svg style={{position:'absolute',top:0,left:0,width:'100%',height:'100%',opacity:0.16}} viewBox="0 0 200 140" preserveAspectRatio="xMidYMid slice">
+        <ChallengePhoto ch={ch}/>
+        {!ch.photo&&<svg style={{position:'absolute',top:0,left:0,width:'100%',height:'100%',opacity:0.16}} viewBox="0 0 200 140" preserveAspectRatio="xMidYMid slice">
           <circle cx="160" cy="24" r="52" fill={pc.pat2}/>
           <circle cx="36" cy="118" r="38" fill={pc.pat1}/>
-        </svg>
-        <div style={{position:'absolute',right:10,top:'46%',transform:'translateY(-50%)',fontSize:58,opacity:0.16,lineHeight:1,userSelect:'none'}}>{ch.icon}</div>
+        </svg>}
+        {!ch.photo&&<div style={{position:'absolute',right:10,top:'46%',transform:'translateY(-50%)',fontSize:58,opacity:0.16,lineHeight:1,userSelect:'none'}}>{ch.icon}</div>}
         <div style={{position:'absolute',bottom:0,left:0,right:0,height:52,background:'linear-gradient(transparent,rgba(0,0,0,0.55))'}}/>
         <div style={{position:'absolute',bottom:8,left:10,right:10,display:'flex',justifyContent:'space-between',alignItems:'center',gap:8}}>
           <span style={{fontSize:11,color:'#FFF',fontWeight:600,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>📍 {ch.biz}</span>
@@ -582,10 +594,14 @@ function HomeTab() {
           </div>
           {featured&&(
             <div style={{minWidth:'100%',scrollSnapAlign:'start',marginLeft:10,background:`linear-gradient(135deg,${fpc.bg1} 0%,${fpc.bg2} 100%)`,borderRadius:16,padding:'20px 18px',position:'relative',overflow:'hidden'}}>
-              <div style={{position:'absolute',right:10,bottom:-6,fontSize:64,opacity:0.2,lineHeight:1}}>{featured.icon}</div>
-              <div style={{fontSize:11,fontWeight:800,color:'rgba(255,255,255,0.85)',letterSpacing:0.6,marginBottom:6}}>FEATURED CHALLENGE</div>
-              <div style={{fontSize:20,fontWeight:800,color:'#FFF',letterSpacing:-0.4,marginBottom:4}}>{featured.title}</div>
-              <div style={{fontSize:13,color:'rgba(255,255,255,0.9)'}}>{featured.biz} · +{featured.pts} pts · until {featured.deadline}</div>
+              <ChallengePhoto ch={featured}/>
+              {featured.photo&&<div style={{position:'absolute',inset:0,background:'linear-gradient(90deg,rgba(0,0,0,0.72) 0%,rgba(0,0,0,0.45) 55%,rgba(0,0,0,0.25) 100%)'}}/>}
+              {!featured.photo&&<div style={{position:'absolute',right:10,bottom:-6,fontSize:64,opacity:0.2,lineHeight:1}}>{featured.icon}</div>}
+              <div style={{position:'relative'}}>
+                <div style={{fontSize:11,fontWeight:800,color:'rgba(255,255,255,0.85)',letterSpacing:0.6,marginBottom:6}}>FEATURED CHALLENGE</div>
+                <div style={{fontSize:20,fontWeight:800,color:'#FFF',letterSpacing:-0.4,marginBottom:4}}>{featured.title}</div>
+                <div style={{fontSize:13,color:'rgba(255,255,255,0.9)'}}>{featured.biz} · +{featured.pts} pts · until {featured.deadline}</div>
+              </div>
             </div>
           )}
         </div>
