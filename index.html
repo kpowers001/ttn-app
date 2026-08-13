@@ -8,6 +8,7 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="https://unpkg.com/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+  <script src="https://unpkg.com/jsqr@1.4.0/dist/jsQR.js"></script>
   <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
   <script src="https://unpkg.com/@babel/standalone@7.22.17/babel.min.js"></script>
@@ -435,7 +436,7 @@ const TabIcon = ({d, extra, on}) => (
 const TABS = [
   {id:'home',        label:'Home',        d:['M3 10.5 12 3l9 7.5','M5 9.5V21h14V9.5']},
   {id:'map',         label:'Map',         d:['M12 21c-4.5-4.4-7-7.6-7-11a7 7 0 0 1 14 0c0 3.4-2.5 6.6-7 11z','M12 7.5a2.5 2.5 0 1 1 0 5 2.5 2.5 0 0 1 0-5z']},
-  {id:'challenges',  label:'Quests',      d:['M13 2 4 14h6l-1 8 9-12h-6l1-8z']},
+  {id:'scan',        label:'Scan QR',     d:['M4 4h6v6H4z','M14 4h6v6h-6z','M4 14h6v6H4z','M14 14h3v3h-3z','M20 14v3','M17 20h3','M14 20h.01']},
   {id:'leaderboard', label:'Ranks',       d:['M8 21h8','M12 17v4','M7 4h10v4a5 5 0 0 1-10 0V4z','M7 5H4a3 3 0 0 0 3.2 5','M17 5h3a3 3 0 0 1-3.2 5']},
   {id:'rewards',     label:'Rewards',     d:['M4 8h16v4H4z','M6 12v8h12v-8','M12 8v12','M12 8C10 8 8 7 8 5.5A1.8 1.8 0 0 1 12 5','M12 8c2 0 4-1 4-2.5A1.8 1.8 0 0 0 12 5']},
   {id:'profile',     label:'Profile',     d:['M12 4a4 4 0 1 1 0 8 4 4 0 0 1 0-8z','M4 21c0-4 3.6-6.5 8-6.5s8 2.5 8 6.5']},
@@ -461,7 +462,19 @@ function TabBar({active,onChange}) {
 const tierFor = pts => TIERS.find(t=>pts>=t.min&&pts<=t.max) ?? TIERS[0];
 
 function ChallengeProductCard({ch,trail}) {
+  const {acceptedIds,refresh}=useData();
+  const [busy,setBusy]=useState(false);
   const pc = PHOTO_CFG[ch.type] || {bg1:DC,bg2:C,pat1:C,pat2:'#FF6060'};
+  const accepted=acceptedIds.has(ch.id);
+  const accept=async()=>{
+    if(!db||busy) return;
+    setBusy(true);
+    const uid=(await db.auth.getUser()).data.user?.id;
+    const {error}=await db.from('challenge_accepts').insert({user_id:uid,challenge_id:ch.id});
+    setBusy(false);
+    if(error&&error.code!=='23505'){ alert(error.message); return; }
+    refresh();
+  };
   return (
     <div style={{width:200,flexShrink:0}}>
       <div style={{height:140,borderRadius:14,background:`linear-gradient(145deg,${pc.bg1} 0%,${pc.bg2} 100%)`,position:'relative',overflow:'hidden',marginBottom:10}}>
@@ -480,6 +493,11 @@ function ChallengeProductCard({ch,trail}) {
       <div style={{fontSize:12,color:T2}}>{trail?.name??''}</div>
       <div style={{fontSize:15,fontWeight:600,color:T1,margin:'2px 0 4px',lineHeight:1.3}}>{ch.title}</div>
       <div style={{fontSize:15,fontWeight:800,color:T1}}>+{ch.pts} pts <span style={{fontWeight:500,fontSize:12,color:T2}}>· until {ch.deadline}</span></div>
+      {ch.active&&db&&(accepted
+        ? <div style={{marginTop:8,fontSize:12,fontWeight:700,color:'#2E7D32'}}>✓ Accepted · check in to complete</div>
+        : <button onClick={accept} disabled={busy} style={{marginTop:8,width:'100%',padding:'10px',background:busy?'#555':'#111',color:'#FFF',border:'none',borderRadius:20,fontSize:13,fontWeight:700,cursor:'pointer'}}>
+            {busy?'Accepting…':'Accept challenge'}
+          </button>)}
     </div>
   );
 }
@@ -728,78 +746,111 @@ function MapTab() {
   );
 }
 
-// ─── Challenges ───────────────────────────────────────────────────────────────
-function ChallengesTab() {
-  const {challenges,trails,acceptedIds,refresh}=useData();
-  const [filter,setFilter]=useState('all');
-  const [busyId,setBusyId]=useState(null);
-  const shown=filter==='all'?challenges:challenges.filter(c=>c.type===filter);
-  const maxBonus=Math.max(0,...challenges.filter(c=>c.active).map(c=>c.pts));
+// ─── Scan (QR check-in) ───────────────────────────────────────────────────────
+function ScanTab() {
+  const {trails,refresh}=useData();
+  const allLocs=Object.entries(trails).flatMap(([k,t])=>t.locations.map(l=>({...l,trail:t})));
+  const videoRef=useRef(null);
+  const [camState,setCamState]=useState('starting');   // starting | on | off
+  const [result,setResult]=useState(null);             // {ok,title,sub}
+  const [manual,setManual]=useState('');
+  const busyRef=useRef(false);
 
-  const accept=async ch=>{
-    if(!db||busyId) return;
-    setBusyId(ch.id);
-    const uid=(await db.auth.getUser()).data.user?.id;
-    const {error}=await db.from('challenge_accepts').insert({user_id:uid,challenge_id:ch.id});
-    setBusyId(null);
-    if(error&&error.code!=='23505'){ alert(error.message); return; }   // 23505 = already accepted
+  const handleCode=async raw=>{
+    if(busyRef.current||!db) return;
+    const code=String(raw||'').trim();
+    const id=(code.match(/([a-z0-9]+(?:-[a-z0-9]+)*)\s*$/i)||[])[1]?.toLowerCase();
+    const loc=allLocs.find(l=>l.id===id);
+    if(!loc){ setResult({ok:false,title:'Not a TTN code',sub:'This code does not match any trail location. Look for the official TTN QR at the register.'}); return; }
+    busyRef.current=true;
+    const {data,error}=await db.rpc('check_in',{p_location_id:loc.id,p_lat:loc.lat,p_lng:loc.lng});
+    busyRef.current=false;
+    if(error){
+      const sub=error.message.includes('duplicate')?'You have already checked in here.':error.message;
+      setResult({ok:false,title:loc.name,sub});
+      return;
+    }
     refresh();
+    setResult({ok:true,title:`Checked in at ${loc.name}!`,sub:`+${data.points_awarded} points earned`});
   };
+
+  useEffect(()=>{
+    let stream, timer, cancelled=false;
+    const canvas=document.createElement('canvas');
+    const ctx=canvas.getContext('2d',{willReadFrequently:true});
+    const detector=('BarcodeDetector' in window)?new window.BarcodeDetector({formats:['qr_code']}):null;
+
+    const tick=async()=>{
+      const v=videoRef.current;
+      if(!v||v.readyState<2) return;
+      try{
+        if(detector){
+          const codes=await detector.detect(v);
+          if(codes.length) handleCode(codes[0].rawValue);
+        } else if(window.jsQR){
+          canvas.width=v.videoWidth; canvas.height=v.videoHeight;
+          ctx.drawImage(v,0,0);
+          const img=ctx.getImageData(0,0,canvas.width,canvas.height);
+          const hit=window.jsQR(img.data,img.width,img.height);
+          if(hit) handleCode(hit.data);
+        }
+      }catch(e){/* keep scanning */}
+    };
+
+    navigator.mediaDevices?.getUserMedia({video:{facingMode:'environment'}})
+      .then(st=>{
+        if(cancelled){ st.getTracks().forEach(t=>t.stop()); return; }
+        stream=st;
+        if(videoRef.current){ videoRef.current.srcObject=st; videoRef.current.play(); }
+        setCamState('on');
+        timer=setInterval(tick,500);
+      })
+      .catch(()=>setCamState('off'));
+
+    return ()=>{ cancelled=true; clearInterval(timer); stream?.getTracks().forEach(t=>t.stop()); };
+  },[]);
+
   return (
-    <div style={{height:'100%',overflowY:'auto',background:BG}} className="scroll">
-      <div style={{background:S1,borderBottom:`1px solid ${BD}`,padding:'0 20px 14px'}}>
+    <div style={{height:'100%',overflowY:'auto',background:'#FFF'}} className="scroll">
+      <div style={{padding:'0 20px 100px'}}>
         <StatusBar/>
-        <div style={{fontSize:22,fontWeight:900,color:T1,letterSpacing:-0.3}}>Challenges ⚡</div>
-        <div style={{fontSize:13,color:T2,marginTop:2}}>Complete to earn points & badges</div>
-      </div>
+        <div style={{fontSize:22,fontWeight:800,color:T1,letterSpacing:-0.4,margin:'8px 0 4px'}}>Scan to check in</div>
+        <div style={{fontSize:13,color:T2,marginBottom:16}}>Find the TTN QR code at the location and point your camera at it.</div>
 
-      <div style={{display:'flex',gap:8,padding:'10px 14px',overflowX:'auto',background:S1,borderBottom:`1px solid ${BD}`}} className="scroll">
-        {[['all','⚡ All'],['food','🍽️ Food'],['farm','🌾 Farm'],['history','🏛️ History'],['arts','🎨 Arts']].map(([k,l])=>(
-          <button key={k} onClick={()=>setFilter(k)} style={{flexShrink:0,padding:'7px 14px',borderRadius:20,border:`1px solid ${filter===k?C:BD}`,background:filter===k?`${C}12`:S1,color:filter===k?C:T2,fontSize:12,fontWeight:700,cursor:'pointer'}}>
-            {l}
-          </button>
-        ))}
-      </div>
-
-      <div style={{margin:'14px 20px 0',background:S1,borderRadius:18,padding:'14px 16px',boxShadow:SH,display:'flex',gap:12,alignItems:'center',border:`1px solid ${C}18`}}>
-        <div style={{width:40,height:40,borderRadius:12,background:`${C}15`,display:'flex',alignItems:'center',justifyContent:'center',fontSize:22}}>⚡</div>
-        <div>
-          <div style={{fontSize:15,fontWeight:800,color:T1}}>{challenges.filter(c=>c.active).length} Active Challenges</div>
-          <div style={{fontSize:12,color:T2}}>Earn up to {maxBonus} bonus pts this week</div>
-        </div>
-      </div>
-
-      <div style={{padding:'12px 20px 100px',display:'flex',flexDirection:'column',gap:12}}>
-        {shown.map(ch=>{
-          const tc=trails[ch.type]?.color||C;
-          const accepted=acceptedIds.has(ch.id);
-          return (
-            <div key={ch.id} style={{background:S1,borderRadius:20,padding:16,boxShadow:SH,opacity:ch.active?1:0.8,cursor:'pointer'}}>
-              <div style={{display:'flex',gap:14,alignItems:'flex-start'}}>
-                <div style={{width:56,height:56,borderRadius:16,background:`${tc}15`,border:`1px solid ${tc}20`,display:'flex',alignItems:'center',justifyContent:'center',fontSize:28,flexShrink:0}}>{ch.icon}</div>
-                <div style={{flex:1}}>
-                  <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start'}}>
-                    <div style={{fontSize:15,fontWeight:800,color:T1,lineHeight:1.25,maxWidth:200}}>{ch.title}</div>
-                    {ch.active&&<span style={{background:`${C}15`,color:C,borderRadius:8,padding:'2px 7px',fontSize:10,fontWeight:800,flexShrink:0,marginLeft:6}}>LIVE</span>}
-                  </div>
-                  <div style={{fontSize:12,color:T2,marginTop:3}}>{ch.biz}</div>
-                  <div style={{display:'flex',gap:7,marginTop:9,flexWrap:'wrap',alignItems:'center'}}>
-                    <Pill bg={GL} col='#9A7810'>+{ch.pts} pts</Pill>
-                    <span style={{fontSize:11,color:T3}}>⏰ {ch.expires}</span>
-                    <span style={{fontSize:15}}>{ch.badge}</span>
-                  </div>
-                </div>
-              </div>
-              {ch.active&&(
-                accepted
-                  ? <div style={{width:'100%',marginTop:14,background:'#E8F5E9',color:'#2E7D32',borderRadius:30,padding:'13px',fontSize:14,fontWeight:800,textAlign:'center',letterSpacing:0.2}}>✓ Accepted · check in to complete</div>
-                  : <button onClick={()=>accept(ch)} disabled={busyId===ch.id} style={{width:'100%',marginTop:14,background:busyId===ch.id?'#E0A0A0':C,color:'#FFF',border:'none',borderRadius:30,padding:'13px',fontSize:14,fontWeight:800,cursor:'pointer',boxShadow:`0 4px 16px rgba(212,32,32,0.28)`,letterSpacing:0.2}}>
-                      {busyId===ch.id?'Accepting…':'Accept Challenge →'}
-                    </button>
-              )}
+        <div style={{position:'relative',borderRadius:16,overflow:'hidden',background:'#111',aspectRatio:'1'}}>
+          <video ref={videoRef} muted playsInline style={{position:'absolute',inset:0,width:'100%',height:'100%',objectFit:'cover'}}/>
+          {camState==='on'&&(
+            <div style={{position:'absolute',inset:0,display:'flex',alignItems:'center',justifyContent:'center'}} aria-hidden="true">
+              <div style={{width:'62%',aspectRatio:'1',border:'2.5px solid rgba(255,255,255,0.9)',borderRadius:18,boxShadow:'0 0 0 2000px rgba(0,0,0,0.35)'}}/>
             </div>
-          );
-        })}
+          )}
+          {camState!=='on'&&(
+            <div style={{position:'absolute',inset:0,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:'0 32px',textAlign:'center',gap:8}}>
+              <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#8A8A8A" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M4 4h6v6H4z"/><path d="M14 4h6v6h-6z"/><path d="M4 14h6v6H4z"/><path d="M14 14h3v3h-3z"/><path d="M20 14v3"/><path d="M17 20h3"/></svg>
+              <div style={{fontSize:14,fontWeight:700,color:'#FFF'}}>{camState==='starting'?'Starting camera…':'Camera unavailable'}</div>
+              {camState==='off'&&<div style={{fontSize:12,color:'#B5B5B5',lineHeight:1.5}}>Allow camera access in your browser settings, or type the code below.</div>}
+            </div>
+          )}
+        </div>
+
+        {result&&(
+          <div style={{marginTop:14,borderRadius:14,padding:'14px 16px',background:result.ok?'#E8F5E9':'#FDECEC',border:`1px solid ${result.ok?'#2E7D3230':'#D4202030'}`}}>
+            <div style={{fontSize:15,fontWeight:800,color:result.ok?'#2E7D32':DC}}>{result.ok?'✓ ':''}{result.title}</div>
+            <div style={{fontSize:13,color:T2,marginTop:2}}>{result.sub}</div>
+          </div>
+        )}
+
+        <div style={{marginTop:20}}>
+          <div style={{fontSize:13,fontWeight:700,color:T1,marginBottom:8}}>No camera? Type the code instead</div>
+          <div style={{display:'flex',gap:8}}>
+            <input value={manual} onChange={e=>setManual(e.target.value)} placeholder="e.g. bb-barbecue" aria-label="Location code"
+              style={{flex:1,padding:'12px 14px',background:G2,border:'none',borderRadius:12,fontSize:14,color:T1,outline:'none'}}/>
+            <button onClick={()=>manual.trim()&&handleCode(manual)} style={{padding:'12px 18px',background:'#111',color:'#FFF',border:'none',borderRadius:12,fontSize:14,fontWeight:700,cursor:'pointer'}}>
+              Check in
+            </button>
+          </div>
+          <div style={{fontSize:12,color:T3,marginTop:8,lineHeight:1.5}}>Each location's code is printed under its QR. Checking in from the Map works too.</div>
+        </div>
       </div>
     </div>
   );
@@ -1132,7 +1183,7 @@ function App() {
   const renderMain=()=>({
     home:        <HomeTab/>,
     map:         <MapTab/>,
-    challenges:  <ChallengesTab/>,
+    scan:        <ScanTab/>,
     leaderboard: <LeaderboardTab/>,
     rewards:     <RewardsTab/>,
     profile:     <ProfileTab/>,
