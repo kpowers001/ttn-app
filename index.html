@@ -25,7 +25,7 @@
     }
     .screen {
       width: 100%; height: 100dvh; overflow: hidden; position: relative;
-      background: #F5F5F5; margin: 0 auto;
+      background: #FFFFFF; margin: 0 auto;
     }
     /* On large screens, keep a readable app column instead of stretching */
     @media (min-width: 640px) {
@@ -57,13 +57,14 @@ const C  = '#D42020';                    // crimson — brand, CTAs
 const DC = '#AA1818';                    // dark crimson
 const G  = '#C8A415';                    // gold
 const GL = '#FEF9E7';                    // gold light tint
-const BG = '#F5F5F5';                    // page background
+const BG = '#FFFFFF';                    // page background (flat white)
+const G2 = '#F2F2F2';                    // inset surfaces: inputs, segments, banner
 const S1 = '#FFFFFF';                    // card/surface
 const T1 = '#1A1A1A';                    // primary text
 const T2 = '#717171';                    // secondary text
 const T3 = '#ADADAD';                    // muted text
 const BD = '#EBEBEB';                    // border
-const SH = '0 1px 10px rgba(0,0,0,0.08)'; // card shadow
+const SH = '0 0 0 1px #ECECEC';          // hairline ring (flat, no shadow)
 
 // ─── Supabase ─────────────────────────────────────────────────────────────────
 // Anon key is public by design; row-level security governs all access.
@@ -217,7 +218,7 @@ async function fetchLive() {
     db.from('rewards').select('*').eq('active', true).order('cost_points'),
     db.from('points_ledger').select('*').order('created_at', {ascending:false}).limit(15),
   ]);
-  const bad = [profileQ, trailsQ, locsQ, visitsQ, chQ, badgesQ, rewardsQ].find(q => q.error);
+  const bad = [profileQ, pointsQ, weeklyQ, allTimeQ, trailsQ, locsQ, visitsQ, chQ, acceptsQ, participantsQ, badgesQ, myBadgesQ, badgeCountsQ, rewardsQ, ledgerQ].find(q => q.error);
   if (bad) throw bad.error;
 
   const visited = new Set(visitsQ.data.map(v => v.location_id));
@@ -235,7 +236,7 @@ async function fetchLive() {
 
   const acceptedIds = new Set((acceptsQ.data ?? []).map(a => a.challenge_id));
   const pCounts = new Map((participantsQ.data ?? []).map(r => [r.challenge_id, Number(r.participants)]));
-  const challenges = chQ.data.map(c => ({
+  const challenges = chQ.data.filter(c => new Date(c.ends_at).getTime() > Date.now()).map(c => ({
     id:c.id, title:c.title, biz:c.business_name, type:c.trail_id,
     locationId:c.location_id, pts:c.bonus_points, icon:c.icon, badge:c.badge_icon,
     active:c.active, expires:fmtExpires(c.active ? c.ends_at : c.starts_at),
@@ -354,7 +355,7 @@ function Field({label,placeholder,type='text',val,onChange}) {
       <div style={{fontSize:11,fontWeight:700,color:focused?C:T3,marginBottom:6,textTransform:'uppercase',letterSpacing:0.8,transition:'color 0.2s'}}>{label}</div>
       <input type={type} value={val} onChange={e=>onChange(e.target.value)} placeholder={placeholder}
         onFocus={()=>setFocused(true)} onBlur={()=>setFocused(false)}
-        style={{width:'100%',padding:'14px 16px',background:BG,border:`1.5px solid ${focused?C:BD}`,borderRadius:14,fontSize:15,color:T1,outline:'none',transition:'border 0.2s'}}
+        style={{width:'100%',padding:'14px 16px',background:G2,border:`1.5px solid ${focused?C:BD}`,borderRadius:14,fontSize:15,color:T1,outline:'none',transition:'border 0.2s'}}
       />
     </div>
   );
@@ -400,7 +401,7 @@ function Login({role,onLogin}) {
             <div>
               <div style={{fontSize:11,fontWeight:700,color:T3,marginBottom:6,textTransform:'uppercase',letterSpacing:0.8}}>Classification</div>
               <select value={form.year} onChange={e=>setForm({...form,year:e.target.value})}
-                style={{width:'100%',padding:'14px 16px',background:BG,border:`1.5px solid ${BD}`,borderRadius:14,fontSize:15,color:form.year?T1:T3,outline:'none',appearance:'none'}}>
+                style={{width:'100%',padding:'14px 16px',background:G2,border:`1.5px solid ${BD}`,borderRadius:14,fontSize:15,color:form.year?T1:T3,outline:'none',appearance:'none'}}>
                 <option value="">Select your year</option>
                 {['Freshman','Sophomore','Junior','Senior','Graduate Student'].map(y=><option key={y}>{y}</option>)}
               </select>
@@ -424,25 +425,31 @@ function Login({role,onLogin}) {
 }
 
 // ─── Tab Bar ──────────────────────────────────────────────────────────────────
+const TabIcon = ({d, extra, on}) => (
+  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={on?'#111111':'#A3A3A3'} strokeWidth={on?2.4:1.8} strokeLinecap="round" strokeLinejoin="round">
+    {d.map((path,i)=><path key={i} d={path}/>)}
+    {extra}
+  </svg>
+);
+
 const TABS = [
-  {id:'home',       icon:'🏠',label:'Home'},
-  {id:'map',        icon:'🗺️',label:'Map'},
-  {id:'challenges', icon:'⚡',label:'Quests'},
-  {id:'leaderboard',icon:'🏆',label:'Ranks'},
-  {id:'rewards',    icon:'🎁',label:'Rewards'},
-  {id:'profile',    icon:'👤',label:'Profile'},
+  {id:'home',        label:'Home',        d:['M3 10.5 12 3l9 7.5','M5 9.5V21h14V9.5']},
+  {id:'map',         label:'Map',         d:['M12 21c-4.5-4.4-7-7.6-7-11a7 7 0 0 1 14 0c0 3.4-2.5 6.6-7 11z','M12 7.5a2.5 2.5 0 1 1 0 5 2.5 2.5 0 0 1 0-5z']},
+  {id:'challenges',  label:'Quests',      d:['M13 2 4 14h6l-1 8 9-12h-6l1-8z']},
+  {id:'leaderboard', label:'Ranks',       d:['M8 21h8','M12 17v4','M7 4h10v4a5 5 0 0 1-10 0V4z','M7 5H4a3 3 0 0 0 3.2 5','M17 5h3a3 3 0 0 1-3.2 5']},
+  {id:'rewards',     label:'Rewards',     d:['M4 8h16v4H4z','M6 12v8h12v-8','M12 8v12','M12 8C10 8 8 7 8 5.5A1.8 1.8 0 0 1 12 5','M12 8c2 0 4-1 4-2.5A1.8 1.8 0 0 0 12 5']},
+  {id:'profile',     label:'Profile',     d:['M12 4a4 4 0 1 1 0 8 4 4 0 0 1 0-8z','M4 21c0-4 3.6-6.5 8-6.5s8 2.5 8 6.5']},
 ];
 
 function TabBar({active,onChange}) {
   return (
-    <div style={{position:'absolute',bottom:0,left:0,right:0,height:'calc(70px + env(safe-area-inset-bottom))',paddingBottom:'env(safe-area-inset-bottom)',background:S1,borderTop:`1px solid ${BD}`,display:'flex',alignItems:'flex-start',paddingTop:10,zIndex:200,boxShadow:'0 -2px 12px rgba(0,0,0,0.06)'}}>
+    <div style={{position:'absolute',bottom:0,left:0,right:0,height:'calc(64px + env(safe-area-inset-bottom))',paddingBottom:'env(safe-area-inset-bottom)',background:'#FFFFFF',borderTop:`1px solid ${BD}`,display:'flex',alignItems:'center',zIndex:200}}>
       {TABS.map(t=>{
         const on=active===t.id;
         return (
-          <button key={t.id} onClick={()=>onChange(t.id)} style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',background:'none',border:'none',cursor:'pointer',padding:'0 2px',position:'relative'}}>
-            {on&&<div style={{position:'absolute',top:-10,width:20,height:2.5,borderRadius:2,background:C}}/>}
-            <div style={{fontSize:19,marginBottom:3,filter:on?'none':'grayscale(1) opacity(0.4)'}}>{t.icon}</div>
-            <div style={{fontSize:9,fontWeight:700,color:on?C:T3,letterSpacing:0.2}}>{t.label}</div>
+          <button key={t.id} onClick={()=>onChange(t.id)} aria-label={t.label}
+            style={{flex:1,display:'flex',alignItems:'center',justifyContent:'center',background:'none',border:'none',cursor:'pointer',padding:'12px 0'}}>
+            <TabIcon d={t.d} on={on}/>
           </button>
         );
       })}
@@ -453,101 +460,149 @@ function TabBar({active,onChange}) {
 // ─── Home ─────────────────────────────────────────────────────────────────────
 const tierFor = pts => TIERS.find(t=>pts>=t.min&&pts<=t.max) ?? TIERS[0];
 
-function HomeTab() {
-  const {me,challenges}=useData();
-  const pts=me.points;
-  const cur=tierFor(pts);
-  const nxt=TIERS[TIERS.indexOf(cur)+1];
-  const pct=nxt?Math.round(((pts-cur.min)/(nxt.min-cur.min))*100):100;
+function ChallengeProductCard({ch,trail}) {
+  const pc = PHOTO_CFG[ch.type] || {bg1:DC,bg2:C,pat1:C,pat2:'#FF6060'};
   return (
-    <div style={{height:'100%',overflowY:'auto',background:BG}} className="scroll">
-      {/* White top bar */}
-      <div style={{background:S1,borderBottom:`1px solid ${BD}`,padding:'0 20px 18px'}}>
+    <div style={{width:200,flexShrink:0}}>
+      <div style={{height:140,borderRadius:14,background:`linear-gradient(145deg,${pc.bg1} 0%,${pc.bg2} 100%)`,position:'relative',overflow:'hidden',marginBottom:10}}>
+        <svg style={{position:'absolute',top:0,left:0,width:'100%',height:'100%',opacity:0.16}} viewBox="0 0 200 140" preserveAspectRatio="xMidYMid slice">
+          <circle cx="160" cy="24" r="52" fill={pc.pat2}/>
+          <circle cx="36" cy="118" r="38" fill={pc.pat1}/>
+        </svg>
+        <div style={{position:'absolute',right:10,top:'46%',transform:'translateY(-50%)',fontSize:58,opacity:0.16,lineHeight:1,userSelect:'none'}}>{ch.icon}</div>
+        <div style={{position:'absolute',bottom:0,left:0,right:0,height:52,background:'linear-gradient(transparent,rgba(0,0,0,0.55))'}}/>
+        <div style={{position:'absolute',bottom:8,left:10,right:10,display:'flex',justifyContent:'space-between',alignItems:'center',gap:8}}>
+          <span style={{fontSize:11,color:'#FFF',fontWeight:600,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>📍 {ch.biz}</span>
+          {ch.participants!=null&&<span style={{fontSize:11,color:'#FFF',fontWeight:600,flexShrink:0}}>👥 {ch.participants}</span>}
+        </div>
+        {ch.active&&<span style={{position:'absolute',top:8,left:8,background:'rgba(255,255,255,0.92)',color:'#111',borderRadius:7,padding:'2px 7px',fontSize:9,fontWeight:800,letterSpacing:0.4}}>LIVE</span>}
+      </div>
+      <div style={{fontSize:12,color:T2}}>{trail?.name??''}</div>
+      <div style={{fontSize:15,fontWeight:600,color:T1,margin:'2px 0 4px',lineHeight:1.3}}>{ch.title}</div>
+      <div style={{fontSize:15,fontWeight:800,color:T1}}>+{ch.pts} pts <span style={{fontWeight:500,fontSize:12,color:T2}}>· until {ch.deadline}</span></div>
+    </div>
+  );
+}
+
+function HomeTab() {
+  const {me,challenges,trails}=useData();
+  const [query,setQuery]=useState('');
+  const [chip,setChip]=useState('all');
+  const [slide,setSlide]=useState(0);
+  const cur=tierFor(me.points);
+  const nxt=TIERS[TIERS.indexOf(cur)+1];
+  const pct=nxt?Math.round(((me.points-cur.min)/(nxt.min-cur.min))*100):100;
+
+  const q=query.trim().toLowerCase();
+  const match=c=>(chip==='all'||c.type===chip)&&(!q||c.title.toLowerCase().includes(q)||c.biz.toLowerCase().includes(q));
+  const activeList=challenges.filter(c=>c.active&&match(c));
+  const upcoming=challenges.filter(c=>!c.active&&match(c));
+  const featured=challenges.find(c=>c.active);
+  const fpc=featured?(PHOTO_CFG[featured.type]||{bg1:DC,bg2:C}):null;
+
+  const onBannerScroll=e=>{
+    const el=e.currentTarget;
+    setSlide(Math.round(el.scrollLeft/el.clientWidth));
+  };
+
+  return (
+    <div style={{height:'100%',overflowY:'auto',background:'#FFF'}} className="scroll">
+      <div style={{padding:'0 20px'}}>
         <StatusBar/>
-        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginTop:6}}>
+
+        {/* Greeting */}
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',margin:'8px 0 14px'}}>
           <div>
             <div style={{fontSize:13,color:T2}}>Good morning,</div>
-            <div style={{fontSize:23,fontWeight:900,color:T1,letterSpacing:-0.4}}>{me.displayName} 🐯</div>
+            <div style={{fontSize:22,fontWeight:800,color:T1,letterSpacing:-0.4}}>{me.displayName}</div>
           </div>
-          <div style={{position:'relative'}}>
-            <div style={{width:44,height:44,borderRadius:'50%',background:BG,border:`1.5px solid ${BD}`,display:'flex',alignItems:'center',justifyContent:'center',fontSize:22}}>{me.avatar}</div>
-          </div>
+          <div style={{width:40,height:40,borderRadius:'50%',background:G2,display:'flex',alignItems:'center',justifyContent:'center',fontSize:20}}>{me.avatar}</div>
         </div>
 
-        {/* Progress card */}
-        <div style={{marginTop:16,background:BG,borderRadius:16,padding:'14px 16px',border:`1px solid ${BD}`}}>
-          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10}}>
-            <span style={{fontSize:12,color:T2,fontWeight:600}}>{nxt?`Progress to ${nxt.tier}`:'Top tier reached'}</span>
-            <div style={{display:'flex',gap:6}}>
-              <Pill bg={GL} col='#9A7810'>{cur.icon} {cur.tier}</Pill>
-              {me.weeklyRank>0&&<Pill bg='#FFF0F0' col={DC}>#{me.weeklyRank} 🏆</Pill>}
+        {/* Search */}
+        <div style={{display:'flex',alignItems:'center',gap:10,background:G2,borderRadius:12,padding:'12px 14px'}}>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#6E6E6E" strokeWidth="2" strokeLinecap="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+          <input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Search challenges & places" aria-label="Search challenges and places"
+            style={{flex:1,border:'none',outline:'none',background:'transparent',fontSize:15,color:T1}}/>
+        </div>
+
+        {/* Trail chips */}
+        <div style={{display:'flex',gap:8,margin:'12px -20px 0',padding:'0 20px 2px',overflowX:'auto'}} className="scroll">
+          {[['all','All',null],...Object.entries(trails).map(([k,t])=>[k,t.name.replace(' Trail','').replace(' & Nature','').replace(' & Culture',''),t.icon])].map(([k,label,ic])=>{
+            const on=chip===k;
+            return (
+              <button key={k} onClick={()=>setChip(k)} style={{flexShrink:0,display:'flex',alignItems:'center',gap:6,padding:'8px 14px',borderRadius:20,border:`1px solid ${on?'#111':'#DDDDDD'}`,background:on?'#111':'#FFF',color:on?'#FFF':T1,fontSize:13,fontWeight:600,cursor:'pointer'}}>
+                {ic&&<span style={{fontSize:13}}>{ic}</span>}{label}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Banner carousel */}
+        <div onScroll={onBannerScroll} style={{display:'flex',overflowX:'auto',scrollSnapType:'x mandatory',borderRadius:16,marginTop:14}} className="scroll">
+          <div style={{minWidth:'100%',scrollSnapAlign:'start',background:G2,borderRadius:16,padding:'20px 18px'}}>
+            <div style={{fontSize:20,fontWeight:800,color:T1,letterSpacing:-0.4,marginBottom:4}}>{nxt?`Progress to ${nxt.tier}`:'Top tier reached'}</div>
+            <div style={{fontSize:13,color:T2,marginBottom:14}}>{me.points.toLocaleString()} pts{nxt?` · ${(nxt.min-me.points).toLocaleString()} to go`:''}{me.weeklyRank>0?` · #${me.weeklyRank} this week`:''}</div>
+            <div style={{height:6,background:'#DDDDDD',borderRadius:3,overflow:'hidden'}}>
+              <div style={{height:'100%',width:`${pct}%`,background:`linear-gradient(90deg,${C},${G})`,borderRadius:3}}/>
             </div>
           </div>
-          <div style={{height:6,background:BD,borderRadius:3,overflow:'hidden',marginBottom:6}}>
-            <div style={{height:'100%',width:`${pct}%`,background:`linear-gradient(90deg,${C},${G})`,borderRadius:3}}/>
-          </div>
-          <div style={{display:'flex',justifyContent:'space-between',fontSize:11,color:T3}}>
-            <span>{cur.tier}</span>
-            <span style={{color:T2,fontWeight:600}}>{pts.toLocaleString()} pts{nxt?` · ${(nxt.min-pts).toLocaleString()} to ${nxt.tier}`:''}</span>
-            <span>{nxt?.tier??''}</span>
-          </div>
+          {featured&&(
+            <div style={{minWidth:'100%',scrollSnapAlign:'start',marginLeft:10,background:`linear-gradient(135deg,${fpc.bg1} 0%,${fpc.bg2} 100%)`,borderRadius:16,padding:'20px 18px',position:'relative',overflow:'hidden'}}>
+              <div style={{position:'absolute',right:10,bottom:-6,fontSize:64,opacity:0.2,lineHeight:1}}>{featured.icon}</div>
+              <div style={{fontSize:11,fontWeight:800,color:'rgba(255,255,255,0.85)',letterSpacing:0.6,marginBottom:6}}>FEATURED CHALLENGE</div>
+              <div style={{fontSize:20,fontWeight:800,color:'#FFF',letterSpacing:-0.4,marginBottom:4}}>{featured.title}</div>
+              <div style={{fontSize:13,color:'rgba(255,255,255,0.9)'}}>{featured.biz} · +{featured.pts} pts · until {featured.deadline}</div>
+            </div>
+          )}
         </div>
+        {featured&&(
+          <div style={{display:'flex',gap:5,justifyContent:'center',marginTop:10}} aria-hidden="true">
+            {[0,1].map(i=><div key={i} style={{width:6,height:6,borderRadius:'50%',background:slide===i?'#111':'#D5D5D5',transition:'background 0.2s'}}/>)}
+          </div>
+        )}
       </div>
 
-      {/* Stories */}
-      <div style={{paddingTop:20}}>
-        <SH2 title="Meet the Community" action="See all"/>
-        <div style={{display:'flex',gap:10,padding:'0 20px',overflowX:'auto',paddingBottom:4}} className="scroll">
-          {STORIES.map(s=>(
-            <div key={s.id} style={{flexShrink:0,cursor:'pointer',width:100}}>
-              {/* Placeholder tile until partner videos are filmed */}
-              <div style={{width:100,height:148,borderRadius:14,background:`linear-gradient(160deg,${s.bg1} 0%,${s.bg2} 100%)`,position:'relative',overflow:'hidden',boxShadow:`0 4px 14px ${s.accent}40`,display:'flex',alignItems:'center',justifyContent:'center'}}>
-                <div style={{position:'absolute',inset:0,background:'rgba(0,0,0,0.18)'}}/>
-                <div style={{position:'relative',textAlign:'center',padding:'0 10px'}}>
-                  <div style={{fontSize:12,fontWeight:800,color:'#FFF',lineHeight:1.35,textShadow:'0 1px 6px rgba(0,0,0,0.35)',letterSpacing:0.2}}>Stories<br/>coming<br/>soon</div>
-                </div>
-              </div>
-              {/* Text below */}
-              <div style={{marginTop:8,paddingRight:4}}>
-                <div style={{fontSize:12,fontWeight:800,color:T1,lineHeight:1.2}}>Meet {s.meet}</div>
-                <div style={{fontSize:10,color:T2,marginTop:2,lineHeight:1.3}}>{s.biz}</div>
-              </div>
+      {/* Stories: circular placeholders */}
+      <SH2 title="Stories"/>
+      <div style={{display:'flex',gap:16,padding:'0 20px 2px',overflowX:'auto'}} className="scroll">
+        {STORIES.map(st=>(
+          <div key={st.id} style={{flexShrink:0,width:74,textAlign:'center'}}>
+            <div style={{width:72,height:72,borderRadius:'50%',background:`linear-gradient(160deg,${st.bg1} 0%,${st.bg2} 100%)`,display:'flex',alignItems:'center',justifyContent:'center',marginBottom:7}}>
+              <div style={{fontSize:9,fontWeight:800,color:'#FFF',lineHeight:1.3,textShadow:'0 1px 4px rgba(0,0,0,0.3)'}}>Coming<br/>soon</div>
             </div>
-          ))}
-        </div>
+            <div style={{fontSize:12,fontWeight:600,color:T1,lineHeight:1.25}}>{st.meet}</div>
+          </div>
+        ))}
       </div>
 
       {/* Active challenges */}
-      <div style={{padding:'22px 20px 0'}}>
-        <SH2 title="🔥 Active Challenges" action="View all"/>
-        <div style={{display:'flex',flexDirection:'column',gap:10}}>
-          {challenges.filter(c=>c.active).map(ch=><LocationChallengeCard key={ch.id} ch={ch}/>)}
-        </div>
-      </div>
+      <SH2 title="Active challenges"/>
+      {activeList.length===0
+        ? <div style={{margin:'0 20px',padding:'22px 18px',background:G2,borderRadius:14,fontSize:13,color:T2,lineHeight:1.5}}>
+            No active challenges{chip!=='all'||q?' match this filter':''} right now. New ones appear here the moment a partner posts them — check Coming up below.
+          </div>
+        : <div style={{display:'flex',gap:14,padding:'0 20px 4px',overflowX:'auto'}} className="scroll">
+            {activeList.map(ch=><ChallengeProductCard key={ch.id} ch={ch} trail={trails[ch.type]}/>)}
+          </div>
+      }
 
       {/* Coming up */}
-      <div style={{padding:'22px 20px 100px'}}>
-        <SH2 title="Coming Up"/>
-        <div style={{display:'flex',gap:10,overflowX:'auto',paddingBottom:4}} className="scroll">
-          {challenges.filter(c=>!c.active).map(ch=>(
-            <div key={ch.id} style={{flexShrink:0,width:148,background:S1,borderRadius:16,padding:14,boxShadow:SH,cursor:'pointer'}}>
-              <div style={{fontSize:30,marginBottom:8}}>{ch.icon}</div>
-              <div style={{fontSize:13,fontWeight:700,color:T1,lineHeight:1.3}}>{ch.title}</div>
-              <div style={{fontSize:11,color:T2,marginTop:2}}>{ch.expires}</div>
-              <div style={{marginTop:8,background:GL,color:'#9A7810',borderRadius:8,padding:'3px 9px',fontSize:11,fontWeight:700,display:'inline-block'}}>+{ch.pts} pts</div>
-            </div>
-          ))}
-        </div>
+      <SH2 title="Coming up"/>
+      <div style={{display:'flex',gap:14,padding:'0 20px 100px',overflowX:'auto'}} className="scroll">
+        {upcoming.length===0
+          ? <div style={{padding:'10px 0 0',fontSize:13,color:T2}}>Nothing scheduled yet.</div>
+          : upcoming.map(ch=><ChallengeProductCard key={ch.id} ch={ch} trail={trails[ch.type]}/>)}
       </div>
     </div>
   );
 }
 
-function SH2({title,action}) {
+function SH2({title}) {
   return (
-    <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:12,padding:'0 20px'}}>
-      <div style={{fontSize:16,fontWeight:800,color:T1,letterSpacing:-0.2}}>{title}</div>
-      {action&&<div style={{fontSize:13,color:C,fontWeight:600,cursor:'pointer'}}>{action}</div>}
+    <div style={{display:'flex',alignItems:'center',gap:7,margin:'26px 20px 14px'}}>
+      <span style={{fontSize:20,fontWeight:800,color:T1,letterSpacing:-0.4}}>{title}</span>
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#111" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M9 5l7 7-7 7"/></svg>
     </div>
   );
 }
@@ -558,52 +613,6 @@ const PHOTO_CFG = {
   farm:    {bg1:'#1A4A1E',bg2:'#4A9E52',pat1:'#2E7D32',pat2:'#76C442'},
   arts:    {bg1:'#3A0060',bg2:'#9040B8',pat1:'#6A1B9A',pat2:'#BA68C8'},
 };
-
-function LocationChallengeCard({ch}) {
-  const {trails} = useData();
-  const pc = PHOTO_CFG[ch.type] || {bg1:DC,bg2:C,pat1:C,pat2:'#FF6060'};
-  const trail = trails[ch.type];
-  return (
-    <div style={{background:S1,borderRadius:20,overflow:'hidden',boxShadow:SH,cursor:'pointer'}}>
-      {/* ── Photo banner ── */}
-      <div style={{position:'relative',height:168,background:`linear-gradient(145deg,${pc.bg1} 0%,${pc.bg2} 100%)`,overflow:'hidden'}}>
-        {/* Background texture */}
-        <svg style={{position:'absolute',top:0,left:0,width:'100%',height:'100%',opacity:0.18}} viewBox="0 0 350 168" preserveAspectRatio="xMidYMid slice">
-          <circle cx="280" cy="30" r="80" fill={pc.pat2}/>
-          <circle cx="60" cy="140" r="55" fill={pc.pat1}/>
-          <circle cx="175" cy="84" r="40" fill={pc.pat2} opacity="0.5"/>
-        </svg>
-        {/* Big icon watermark */}
-        <div style={{position:'absolute',right:12,top:'50%',transform:'translateY(-50%)',fontSize:88,opacity:0.13,userSelect:'none',lineHeight:1}}>{ch.icon}</div>
-        {/* Bottom gradient for text legibility */}
-        <div style={{position:'absolute',bottom:0,left:0,right:0,height:72,background:'linear-gradient(transparent,rgba(0,0,0,0.62))'}}/>
-        {/* Location label */}
-        <div style={{position:'absolute',bottom:11,left:12,display:'flex',alignItems:'center',gap:5}}>
-          <span style={{fontSize:11,lineHeight:1}}>📍</span>
-          <span style={{fontSize:13,color:'#FFF',fontWeight:600,textShadow:'0 1px 4px rgba(0,0,0,0.4)'}}>{ch.biz}</span>
-        </div>
-        {/* Participant count (hidden when the backend doesn't expose it) */}
-        {ch.participants!=null&&(
-          <div style={{position:'absolute',bottom:10,right:12,display:'flex',alignItems:'center',gap:5}}>
-            <span style={{fontSize:14,lineHeight:1}}>👥</span>
-            <span style={{fontSize:13,color:'#FFF',fontWeight:600,textShadow:'0 1px 4px rgba(0,0,0,0.4)'}}>{ch.participants}</span>
-          </div>
-        )}
-      </div>
-
-      {/* ── Content ── */}
-      <div style={{padding:'14px 16px 16px'}}>
-        <div style={{fontSize:16,fontWeight:800,color:T1,letterSpacing:-0.3,lineHeight:1.3,marginBottom:4}}>{ch.title}</div>
-        <div style={{fontSize:13,color:T2,lineHeight:1.45,marginBottom:13}}>{ch.desc}</div>
-        <div style={{display:'flex',gap:7,flexWrap:'wrap',alignItems:'center'}}>
-          <Pill bg='#F5ECD5' col='#7A5C10'>{trail?.icon} {trail?.name}</Pill>
-          <Pill bg='#E9F5E9' col='#2A6830'>+{ch.pts} pts</Pill>
-          <Pill bg={T1} col='#FFF'>Until {ch.deadline}</Pill>
-        </div>
-      </div>
-    </div>
-  );
-}
 
 // ─── Map ──────────────────────────────────────────────────────────────────────
 function MapTab() {
@@ -806,7 +815,7 @@ function ChallengesTab() {
               </div>
               {ch.active&&(
                 accepted
-                  ? <div style={{width:'100%',marginTop:14,background:'#E8F5E9',color:'#2E7D32',borderRadius:30,padding:'13px',fontSize:14,fontWeight:800,textAlign:'center',letterSpacing:0.2}}>✓ Accepted — check in to complete</div>
+                  ? <div style={{width:'100%',marginTop:14,background:'#E8F5E9',color:'#2E7D32',borderRadius:30,padding:'13px',fontSize:14,fontWeight:800,textAlign:'center',letterSpacing:0.2}}>✓ Accepted · check in to complete</div>
                   : <button onClick={()=>accept(ch)} disabled={busyId===ch.id} style={{width:'100%',marginTop:14,background:busyId===ch.id?'#E0A0A0':C,color:'#FFF',border:'none',borderRadius:30,padding:'13px',fontSize:14,fontWeight:800,cursor:'pointer',boxShadow:`0 4px 16px rgba(212,32,32,0.28)`,letterSpacing:0.2}}>
                       {busyId===ch.id?'Accepting…':'Accept Challenge →'}
                     </button>
@@ -834,7 +843,7 @@ function LeaderboardTab() {
         <StatusBar/>
         <div style={{fontSize:22,fontWeight:900,color:T1,letterSpacing:-0.3}}>Leaderboard 🏆</div>
         <div style={{fontSize:13,color:T2,marginTop:2}}>Compete with your peers</div>
-        <div style={{display:'flex',gap:4,marginTop:14,background:BG,borderRadius:12,padding:4}}>
+        <div style={{display:'flex',gap:4,marginTop:14,background:G2,borderRadius:12,padding:4}}>
           {[['weekly','Weekly'],['allTime','All Time']].map(([k,l])=>(
             <button key={k} onClick={()=>setPeriod(k)} style={{flex:1,padding:'9px 4px',border:'none',borderRadius:8,background:period===k?S1:'transparent',color:period===k?C:T2,fontSize:12,fontWeight:700,cursor:'pointer',transition:'all 0.2s',boxShadow:period===k?SH:undefined}}>
               {l}
@@ -1114,7 +1123,11 @@ function App() {
 
   // Load (or reload) live data whenever there's a session
   const refresh=()=>{
-    if(db) fetchLive().then(setLive).catch(e=>console.warn('live fetch failed, using fallback:',e?.message??e));
+    if(!db) return;
+    fetchLive().then(setLive).catch(()=>{
+      // transient failures (e.g. a token refresh mid-load) get one retry
+      setTimeout(()=>fetchLive().then(setLive).catch(e=>console.warn('live fetch failed, using fallback:',e?.message??e)),1500);
+    });
   };
   useEffect(()=>{ if(session) refresh(); },[session]);
 
@@ -1156,7 +1169,7 @@ function App() {
         {screen==='login'  && <Login role={role} onLogin={()=>setScreen('main')}/>}
         {screen==='main'   && (
           <div style={{width:'100%',height:'100%',position:'relative',background:BG}}>
-            <div style={{height:'calc(100% - 70px - env(safe-area-inset-bottom))',overflow:'hidden'}}>{renderMain()}</div>
+            <div style={{height:'calc(100% - 64px - env(safe-area-inset-bottom))',overflow:'hidden'}}>{renderMain()}</div>
             <TabBar active={tab} onChange={setTab}/>
           </div>
         )}
