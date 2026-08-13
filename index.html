@@ -535,11 +535,21 @@ function HomeTab() {
 
         {/* Banner carousel */}
         <div onScroll={onBannerScroll} style={{display:'flex',overflowX:'auto',scrollSnapType:'x mandatory',borderRadius:16,marginTop:14}} className="scroll">
-          <div style={{minWidth:'100%',scrollSnapAlign:'start',background:G2,borderRadius:16,padding:'20px 18px'}}>
-            <div style={{fontSize:20,fontWeight:800,color:T1,letterSpacing:-0.4,marginBottom:4}}>{nxt?`Progress to ${nxt.tier}`:'Top tier reached'}</div>
-            <div style={{fontSize:13,color:T2,marginBottom:14}}>{me.points.toLocaleString()} pts{nxt?` · ${(nxt.min-me.points).toLocaleString()} to go`:''}{me.weeklyRank>0?` · #${me.weeklyRank} this week`:''}</div>
-            <div style={{height:6,background:'#DDDDDD',borderRadius:3,overflow:'hidden'}}>
-              <div style={{height:'100%',width:`${pct}%`,background:`linear-gradient(90deg,${C},${G})`,borderRadius:3}}/>
+          <div style={{minWidth:'100%',scrollSnapAlign:'start',background:G2,borderRadius:16,padding:'18px',display:'flex',alignItems:'center',gap:14}}>
+            {/* Emblem of the badge being worked toward (dashed = not yet earned) */}
+            <div style={{width:60,height:60,borderRadius:'50%',border:nxt?'2px dashed #B5B5B5':`2px solid ${G}`,background:'#FFF',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
+              <span style={{fontSize:27,filter:nxt?'grayscale(0.6)':'none',opacity:nxt?0.7:1}}>{(nxt??cur).icon}</span>
+            </div>
+            <div style={{flex:1,minWidth:0}}>
+              <div style={{fontSize:15,fontWeight:800,color:T1,letterSpacing:-0.2,marginBottom:9}}>{nxt?`Working toward ${nxt.tier}`:`${cur.tier} · top tier reached`}</div>
+              <div style={{height:6,background:'#DDDDDD',borderRadius:3,overflow:'hidden'}}>
+                <div style={{height:'100%',width:`${pct}%`,background:`linear-gradient(90deg,${C},${G})`,borderRadius:3}}/>
+              </div>
+              <div style={{fontSize:13,color:T2,marginTop:9}}>
+                <span style={{color:T1,fontWeight:800}}>{me.points.toLocaleString()}</span>
+                {nxt?` / ${nxt.min.toLocaleString()} points`:' points'}
+                {me.weeklyRank>0?` · #${me.weeklyRank} this week`:''}
+              </div>
             </div>
           </div>
           {featured&&(
