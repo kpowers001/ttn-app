@@ -121,7 +121,7 @@ const ALL_LOCS = Object.entries(TRAILS).flatMap(([k,t])=>t.locations.map(l=>({..
 const CHALLENGES = [
   // ── Active ──
   {id:1, title:'Friday Night Pit Special',  biz:'B&B Barbecue',                type:'food',    pts:150, expires:'2 days',   deadline:'Jul 11', participants:24, desc:'Visit the legendary B&B pit on Fonville St and taste classic Alabama smoked meats.',             icon:'🍖', badge:'🔥', active:true, photo:'photos/bb-barbecue.jpg'},
-  {id:2, title:'Pick Before Season Ends',   biz:'Shady Grove Blueberry Patch', type:'farm',    pts:200, expires:'4 days',   deadline:'Jul 13', participants:12, desc:'Head to County Road 81 and pick fresh blueberries straight from the vine before the season closes.', icon:'🫐', badge:'🌱', active:true},
+  {id:2, title:'Pick Before Season Ends',   biz:'Shady Grove Blueberry Patch', type:'farm',    pts:200, expires:'4 days',   deadline:'Jul 13', participants:12, photo:'photos/shady-grove.jpg', desc:'Head to County Road 81 and pick fresh blueberries straight from the vine before the season closes.', icon:'🫐', badge:'🌱', active:true},
   {id:3, title:'Art & Ethics Walk',         biz:'Legacy Museum',               type:'arts',    pts:175, expires:'Tomorrow', deadline:'Jul 9',  participants:31, desc:'Tour the TU Legacy Museum — student art collections and groundbreaking bioethics research on campus.', icon:'🎨', badge:'🎭', active:true},
   // ── Coming Up ──
   {id:4, title:'Airmen History Day',        biz:'Tuskegee Airmen NHS',         type:'history', pts:250, expires:'Next week',deadline:'Jul 15', participants:8,  desc:'Visit Moton Field and learn how the Tuskegee Airmen changed American military history forever.',       icon:'✈️', badge:'📚', active:false},
@@ -546,7 +546,8 @@ function HomeTab() {
 
   const activeList=challenges.filter(c=>c.active);
   const upcoming=challenges.filter(c=>!c.active);
-  const featured=challenges.find(c=>c.active);
+  // Prefer a live challenge with a real partner photo for the banner
+  const featured=challenges.find(c=>c.active&&c.photo)??challenges.find(c=>c.active);
   const fpc=featured?(PHOTO_CFG[featured.type]||{bg1:DC,bg2:C}):null;
 
   const onBannerScroll=e=>{
