@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Try the Tuskegee Trail Network</title>
+  <script src="https://unpkg.com/qrcodejs@1.0.0/qrcode.min.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, 'Segoe UI', sans-serif;
+      min-height: 100vh; display: flex; flex-direction: column;
+      align-items: center; justify-content: center; gap: 22px;
+      background: #FFFFFF; color: #111; padding: 40px 24px; text-align: center;
+    }
+    .kicker { font-size: 14px; font-weight: 700; letter-spacing: 2px; color: #8B1A1A; }
+    h1 { font-size: clamp(28px, 5vw, 44px); font-weight: 800; letter-spacing: -1px; }
+    p.sub { font-size: clamp(15px, 2.2vw, 19px); color: #555; max-width: 46ch; line-height: 1.5; }
+    .qr-wrap { background: #FFF; border: 2px solid #111; border-radius: 24px; padding: 26px; }
+    .url { font-size: clamp(14px, 2vw, 18px); font-weight: 700; font-family: ui-monospace, monospace; }
+    .hint { font-size: 13px; color: #888; max-width: 52ch; line-height: 1.5; }
+    button {
+      font-family: inherit; font-size: 14px; font-weight: 700; color: #FFF; background: #111;
+      border: none; border-radius: 24px; padding: 12px 24px; cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <div class="kicker">TUSKEGEE TRAIL NETWORK</div>
+  <h1>Scan to explore Tuskegee</h1>
+  <p class="sub">Point your phone camera at the code to open the app. Create an account with a tuskegee.edu-style email, accept a challenge, and check in.</p>
+  <div class="qr-wrap" id="qr"></div>
+  <div class="url">kpowers001.github.io/ttn-app</div>
+  <p class="hint">Works in any mobile browser — nothing to install.</p>
+  <button id="dl">Download QR as image</button>
+  <script>
+    const APP_URL = 'https://kpowers001.github.io/ttn-app/';
+    new QRCode(document.getElementById('qr'), { text: APP_URL, width: 300, height: 300, correctLevel: QRCode.CorrectLevel.M });
+    document.getElementById('dl').addEventListener('click', () => {
+      const canvas = document.querySelector('#qr canvas');
+      const a = document.createElement('a');
+      a.download = 'ttn-app-qr.png';
+      a.href = canvas.toDataURL('image/png');
+      a.click();
+    });
+  </script>
+</body>
+</html>
