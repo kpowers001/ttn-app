@@ -143,10 +143,10 @@ const TIERS = [
 
 const STORIES = [
   {id:1, meet:'Meet Ms. Josie',         bg1:'#1A4A1E', bg2:'#4A9E52', accent:'#2E7D32'},
-  {id:2, meet:'Mrs. King',              bg1:'#5C0E0E', bg2:'#A83030', accent:'#8B1A1A'},
-  {id:3, meet:'Mr. B',                  bg1:'#B03A00', bg2:'#E8722A', accent:'#D44000'},
-  {id:4, meet:'Ms. Taylor & the Bees',  bg1:'#7A5A00', bg2:'#C8A415', accent:'#C8A415'},
-  {id:5, meet:'Dragons in Tuskegee?!',  bg1:'#3A0060', bg2:'#9040B8', accent:'#6A1B9A'},
+  {id:2, meet:'Meet Mrs. King',         bg1:'#5C0E0E', bg2:'#A83030', accent:'#8B1A1A'},
+  {id:3, meet:'Meet Mr. B',             bg1:'#B03A00', bg2:'#E8722A', accent:'#D44000'},
+  {id:4, meet:'Meet Ms. Taylor',        bg1:'#7A5A00', bg2:'#C8A415', accent:'#C8A415'},
+  {id:5, meet:'Meet Don',               bg1:'#3A0060', bg2:'#9040B8', accent:'#6A1B9A'},
 ];
 
 const BADGES_DATA = [
@@ -545,7 +545,7 @@ function HomeTab() {
       <div style={{display:'flex',gap:16,padding:'0 20px 2px',overflowX:'auto'}} className="scroll">
         {STORIES.map(st=>(
           <div key={st.id} style={{flexShrink:0,width:86,textAlign:'center'}}>
-            <div style={{width:72,height:72,borderRadius:'50%',background:`linear-gradient(160deg,${st.bg1} 0%,${st.bg2} 100%)`,display:'flex',alignItems:'center',justifyContent:'center',marginBottom:7}}>
+            <div style={{width:72,height:72,borderRadius:'50%',background:`linear-gradient(160deg,${st.bg1} 0%,${st.bg2} 100%)`,display:'flex',alignItems:'center',justifyContent:'center',margin:'0 auto 7px'}}>
               <div style={{fontSize:9,fontWeight:800,color:'#FFF',lineHeight:1.3,textShadow:'0 1px 4px rgba(0,0,0,0.3)'}}>Coming<br/>soon</div>
             </div>
             <div style={{fontSize:12,fontWeight:600,color:T1,lineHeight:1.25}}>{st.meet}</div>
